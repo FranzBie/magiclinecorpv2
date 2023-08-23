@@ -24,8 +24,8 @@
                     </a>
                 @endcan
 
+                {{-- Trashcan Button --}}
                 @can('super_admin', Auth::user())
-                    {{-- Trashcan Button --}}
                     @if ($mannequins->contains('activeStatus', 0))
                         <div class="ml-2">
                             <a href="{{ route('collection.trashcan') }}" class="text-gray-800 hover:text-gray-600">

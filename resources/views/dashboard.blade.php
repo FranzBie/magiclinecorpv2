@@ -58,7 +58,7 @@
                     @endcan
                     {{-- owner shows table below --}}
                     @can('owner', Auth::user())
-                    <a href="#" id="showTableButton" class="companyFilter show-table-button block text-center relative overflow-hidden group" data-company="{{ $company->name }}">{{-- {{ route('collection', ['company' => $company->name]) }} --}}
+                    <a href="#" id="showTableButton" class="companyFilter show-table-button block text-center relative overflow-hidden group" data-company="{{ $company->name }}" onclick="scrollToElement('mannequinsTable')">{{-- {{ route('collection', ['company' => $company->name]) }} --}}
                     @endcan
                         <!-- Content for the first square -->
                         <div class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap bg-gray-50 dark:text-white dark:bg-gray-800 rounded-md">
@@ -129,67 +129,79 @@
                 </div>
                 @endcan
 
+                {{-- TABLE (for owner) --}}
                 @can('owner', Auth::user())
                 <div id="tableContainer" class="w-full sm:w-full p-4" style="display: none;">
-                {{-- TABLE --}}
-                <table id="mannequinsTable" class="w-full table-auto border-collapse border">
-                    <thead class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap bg-gray-50 dark:text-white dark:bg-gray-800">
-                        <tr>
-                            <th class="px-4 py-2 border">
-                                <input type="checkbox" id="selectAllCheckbox">
-                            </th>
-                            <th class="px-4 py-2 border">Image</th>
-                            <th class="px-4 py-2 border">Item Reference</th>
-                            <th class="px-4 py-2 border">Company</th>
-                            <th class="px-4 py-2 border">Category</th>
-                            <th class="px-4 py-2 border">Type</th>
-                            <th class="px-4 py-2 border">Action By</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($mannequins as $mannequin)
-                            @if ($mannequin->activeStatus != 0)
-                                <tr class="border">
-                                    <td class="px-4 py-2 border">
-                                        <!-- Add the checkbox input here -->
-                                        <input type="checkbox" class=" row-checkbox center pb-4">
-                                    </td>
-                                    <td class="px-4 py-2 border">
-                                        @php
-                                            // Split the image paths string into an array
-                                            $imagePaths = explode(',', $mannequin->images);
-                                            // Get the first image path from the array
-                                            $firstImagePath = $imagePaths[0] ?? null;
-                                        @endphp
-                                        @if ($firstImagePath)
-                                            <img src="{{ asset('storage/' . $firstImagePath) }}" alt="Mannequin Photo" width="100">
-                                        @else
-                                            No Image
-                                        @endif
-                                    </td>
-                                    <td class="px-4 py-2 border itemref-cell">
-                                        <span class="itemref-text">{{ $mannequin->itemref }}</span>
-                                        {{-- HOVER to show read, update, and delete --}}
-                                        <div class="action-buttons">
 
-                                            <a href="{{ route('collection.view_prod', ['encryptedId' => Crypt::encrypt($mannequin->id)]) }}" class="btn-view">
-                                                <i class="fas fa-eye"></i> View
-                                            </a>
-                                            {{-- Admin --}}
-                                            <a href="{{ route('collection.edit', ['id' => $mannequin->id]) }}" class="btn-view">
-                                                <i class="fas fa-edit"></i> Edit
-                                            </a>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-2 border">{{ $mannequin->company }}</td>
-                                    <td class="px-4 py-2 border">{{ $mannequin->category }}</td>
-                                    <td class="px-4 py-2 border">{{ $mannequin->type }}</td>
-                                    <td class="px-4 py-2 border">{{ $mannequin->addedBy }}</td>
-                                </tr>
-                            @endif
-                        @endforeach
-                    </tbody>
-                </table>
+                    {{-- company FILTER--}}
+                    <div class="filter-dropdown">
+                        <select id="companyFilter" class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Filter by Company">
+                            <option value="">All Companies</option>
+                            @foreach ($companies as $company)
+                                <option value="{{ $company->name }}">{{ $company->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    {{-- TABLE --}}
+                    <table id="mannequinsTable" class="w-full table-auto border-collapse border">
+                        <thead class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap bg-gray-50 dark:text-white dark:bg-gray-800">
+                            <tr>
+                                <th class="px-4 py-2 border">
+                                    <input type="checkbox" id="selectAllCheckbox">
+                                </th>
+                                <th class="px-4 py-2 border">Image</th>
+                                <th class="px-4 py-2 border">Item Reference</th>
+                                <th class="px-4 py-2 border">Company</th>
+                                <th class="px-4 py-2 border">Category</th>
+                                <th class="px-4 py-2 border">Type</th>
+                                <th class="px-4 py-2 border">Action By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($mannequins as $mannequin)
+                                @if ($mannequin->activeStatus != 0)
+                                    <tr class="border">
+                                        <td class="px-4 py-2 border">
+                                            <!-- Add the checkbox input here -->
+                                            <input type="checkbox" class=" row-checkbox center pb-4">
+                                        </td>
+                                        <td class="px-4 py-2 border">
+                                            @php
+                                                // Split the image paths string into an array
+                                                $imagePaths = explode(',', $mannequin->images);
+                                                // Get the first image path from the array
+                                                $firstImagePath = $imagePaths[0] ?? null;
+                                            @endphp
+                                            @if ($firstImagePath)
+                                                <img src="{{ asset('storage/' . $firstImagePath) }}" alt="Mannequin Photo" width="100">
+                                            @else
+                                                No Image
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-2 border itemref-cell">
+                                            <span class="itemref-text">{{ $mannequin->itemref }}</span>
+                                            {{-- HOVER to show read, update, and delete --}}
+                                            <div class="action-buttons">
+
+                                                <a href="{{ route('collection.view_prod', ['encryptedId' => Crypt::encrypt($mannequin->id)]) }}" class="btn-view">
+                                                    <i class="fas fa-eye"></i> View
+                                                </a>
+                                                {{-- Admin --}}
+                                                <a href="{{ route('collection.edit', ['id' => $mannequin->id]) }}" class="btn-view">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </a>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-2 border">{{ $mannequin->company }}</td>
+                                        <td class="px-4 py-2 border">{{ $mannequin->category }}</td>
+                                        <td class="px-4 py-2 border">{{ $mannequin->type }}</td>
+                                        <td class="px-4 py-2 border">{{ $mannequin->addedBy }}</td>
+                                    </tr>
+                                @endif
+                            @endforeach
+                        </tbody>
+                    </table>
                 {{-- END TABLE --}}
                 </div>
                 @endcan
@@ -206,34 +218,62 @@
                 lengthChange: false,
             });
 
-             // showAllProducts
-             $('.showAllProducts').on('click', function(event) {
+            // Handle company filter(ON TOP OF TABLE)
+            $('#companyFilter').on('change', function() {
+                var company = $(this).val();
+                table.column(3) // company column index (0-based)
+                    .search(company)
+                    .draw();
+            });
+
+            // showAllProducts
+            $('.showAllProducts').on('click', function(event) {
                 event.preventDefault();
                 $('#tableContainer').show(); // Show the table container
 
                 // Clear existing search/filtering and draw the original table
-                var table = $('#mannequinsTable').DataTable();
                 table.search('').columns().search('').draw();
+
+                $('#companyFilter').val('');
+
+                // Scroll to the table container
+                scrollToElement('tableContainer');
             });
 
-            // Handle company filter change
+           // Handle company filter change
             $('.companyFilter').on('click', function(event) {
                 event.preventDefault();
 
                 var company = $(this).data('company');
 
                 // Clear existing search and apply new company filter
-                table.search('').draw(); // Clear any previous search
-                table.column(3) // Company column index (0-based)
+                table.search('').draw(); // Clear previous search
+                table.column(3) // Company column index
                     .search(company)
                     .draw();
+
+                // Update the company filter dropdown's selected value
+                $('#companyFilter').val(company);
+
+                // Scroll to the table container
+                scrollToElement('tableContainer');
             });
 
-            //Show table
+            // Show table
             $('.show-table-button').on('click', function(event) {
                 event.preventDefault();
                 $('#tableContainer').show(); // Show the table container
+
+                // Scroll to the table container
+                scrollToElement('tableContainer');
             });
+
+            function scrollToElement(elementId) {
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
         });
     </script>
 

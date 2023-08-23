@@ -10,8 +10,8 @@
     </x-slot>
 
     <div class="container mx-auto p-4">
-
         <div class="bg-white shadow-md rounded-lg overflow-x-auto px-4 py-6">
+            {{-- LOGIN LIST TABLE --}}
             <table id="auditTrailTable" class="w-full table-auto border-collapse border">
                 <thead class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap bg-gray-50 dark:text-white dark:bg-gray-800">
                     <tr>
@@ -32,6 +32,17 @@
                     @endforeach
                 </tbody>
             </table>
+            <div class="mt-4">
+                @if ($audits instanceof Illuminate\Pagination\LengthAwarePaginator)
+                    <a href="{{ route('audit-trail', ['showAll' => 1]) }}" class="text-blue-500 hover:underline">
+                        View All Records
+                    </a>
+                @else
+                    <a href="{{ route('audit-trail') }}" class="text-blue-500 hover:underline">
+                        Paginated View
+                    </a>
+                @endif
+            </div>
         </div>
     </div>
 
@@ -41,12 +52,11 @@
     <script>
         $(document).ready(function() {
             var table = $('#auditTrailTable').DataTable({
-                lengthChange: false,
-                order: [[3, "desc"]] // Set default sorting order for timestamp column (index 2) to ascending
+                order: [[3, 'desc']], // Order by timestamp column (index 3) in descending order,
+                lengthChange: false, // Disable the "Show x entries" dropdown
             });
         });
     </script>
-
 
     {{-- SweetAlert --}}
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>

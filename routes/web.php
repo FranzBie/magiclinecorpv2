@@ -30,8 +30,13 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'admin-access'])->group(function () {
     // Only Admin 1 can access these routes
+    //users
     Route::get('/users', [UsersController::class, 'index'])->name('users');
     Route::post('/users-add', [UsersController::class, 'store'])->name('users.add');
+    // Company
+    Route::get('/company', [CompanyController::class, 'index'])->name('company');
+    Route::post('/add-company', [CompanyController::class, 'company'])->name('company.add');
+
 });
 
 Route::middleware(['auth', 'can:viewer-access'])->group(function () {
@@ -71,9 +76,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/collection-type', [CollectionController::class, 'type'])->name('collection.type');
     Route::post('/collection-type', [CollectionController::class, 'store_type'])->name('collection.type.store');
 
-    // Company
-    Route::get('/company', [CompanyController::class, 'index'])->name('company');
-    Route::post('/add-company', [CompanyController::class, 'company'])->name('company.add');
+    // // Company
+    // Route::get('/company', [CompanyController::class, 'index'])->name('company');
+    // Route::post('/add-company', [CompanyController::class, 'company'])->name('company.add');
 
     //Users
     // Route::get('/users', [UsersController::class, 'index'])->name('users');

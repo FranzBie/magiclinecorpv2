@@ -103,13 +103,29 @@ class CollectionController extends Controller
         }
 
         $mannequin = Mannequin::find($id);
+
         if (!$mannequin) {
             return redirect()->route('collection')->with('danger_message', 'Mannequin not found.');
         }
 
         // Check if the user's status is 1 and get the checkPrice value for the user's company
         $user = Auth::user();
-        $canViewPrice = $user->status == 1 || $user->companies()->where('companies.id', $mannequin->company_id)->whereNotNull('company_user.checkPrice')->exists();//TO BE CHANGED
+
+        //Get company id from company from mannequin
+        $companyName = $mannequin->company;
+        $company = Company::where('name', $companyName)->first();
+        $company_id = $company->id;
+
+        // check if checkPrice of user has 1 on viewed product/mannequin
+        $canViewPriceForCompany = $user->companies()->where('companies.id', $company_id)->where('company_user.checkPrice', 1)->exists();
+
+        if ($user->status == 1 || $canViewPriceForCompany) {
+            $canViewPrice = true;
+        } else {
+            $canViewPrice = false;
+        }
+
+        // dd($canViewPrice);
 
         // Return the view with the mannequin data, $id, and $canViewPrice
         return view('collection-view', [
@@ -117,6 +133,7 @@ class CollectionController extends Controller
             'encryptedId' => $encryptedId,
             'canViewPrice' => $canViewPrice,
         ]);
+
     }
 
     // VIEW MODULE FOR ADD PRODUCT
