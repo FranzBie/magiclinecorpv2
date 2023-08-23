@@ -28,17 +28,10 @@ Route::get('/', function () {
     return view('auth.login');
 })->name('auth.login')->middleware('guest');
 
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-});
-
-Route::middleware(['auth', 'check.user.role:1,2'])->group(function () {
-    // Only Admin 1 and Admin 2 can access these routes
+Route::middleware(['auth', 'admin-access'])->group(function () {
+    // Only Admin 1 can access these routes
     Route::get('/users', [UsersController::class, 'index'])->name('users');
-    // ... other routes for Admin 1 and Admin 2
+    Route::post('/users-add', [UsersController::class, 'store'])->name('users.add');
 });
 
 Route::middleware(['auth', 'can:viewer-access'])->group(function () {
@@ -48,6 +41,12 @@ Route::middleware(['auth', 'can:viewer-access'])->group(function () {
     //  Route::get('/company', [CompanyController::class, 'index'])->name('company');
     // ... other routes for Viewer
 });
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // Collection/Product
     Route::get('/collection', [CollectionController::class, 'index'])->name('collection');
@@ -77,13 +76,13 @@ Route::middleware(['auth', 'can:viewer-access'])->group(function () {
     Route::post('/add-company', [CompanyController::class, 'company'])->name('company.add');
 
     //Users
-    Route::get('/users', [UsersController::class, 'index'])->name('users');
-    Route::post('/users-add', [UsersController::class, 'store'])->name('users.add');
+    // Route::get('/users', [UsersController::class, 'index'])->name('users');
+    // Route::post('/users-add', [UsersController::class, 'store'])->name('users.add');
 
 
     //Audit trail
     Route::get('/audit-trail', [AuditTrailController::class, 'index'])->name('audit-trail');
 
-
+});
 
 require __DIR__.'/auth.php';

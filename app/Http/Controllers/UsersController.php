@@ -52,6 +52,6 @@ class UsersController extends Controller
         $user->companies()->updateExistingPivot($request->input('selected_company_ids'), ['checkPrice' => 1]);
 
         // Redirect or do something else after successful registration
-        return redirect()->route('collection')->with('success_message', 'User created successfully.');
+        return redirect()->route('users')->with('success_message', 'User created successfully.');
     }
 }

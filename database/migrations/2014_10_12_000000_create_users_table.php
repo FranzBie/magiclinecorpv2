@@ -18,7 +18,8 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('status');//admin 1(1), admin 2(2), viewer(3), owner(4)
-            $table->string('company_user');
+            // $table->string('company_user');
+            $table->string('addedBy');
             $table->string('password');
             $table->rememberToken();
             $table->timestamps();

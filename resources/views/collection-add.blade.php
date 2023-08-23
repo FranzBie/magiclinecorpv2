@@ -23,6 +23,8 @@
             </nav>
         </div>
     </x-slot>
+
+    {{-- IMG VIEW CONTAINER --}}
     <style>
         .image-container {
             display: inline-block;
@@ -64,6 +66,7 @@
             @csrf
             @method('PUT')
             <div class="grid grid-cols-2 gap-4">
+
                 {{-- Purchase order --}}
                 <div class="col-span-2 sm:col-span-1">
                     <label for="po" class="block font-bold mb-2">PO</label>
@@ -74,11 +77,11 @@
                     <label for="itemRef" class="block font-bold mb-2">Item Reference</label>
                     <input type="text" name="itemRef" id="itemRef" class="w-full border rounded-md py-2 px-3" placeholder="Enter Item Ref">
                 </div>
-                {{-- Company --}}
+                {{-- COMPANIES --}}
                 <div class="col-span-2 sm:col-span-1">
-                    <label for="companies" class="block font-bold mb-2">Companies</label>
+                    <label for="company" class="block font-bold mb-2">Company</label>
                     <div class="col-span-2 sm:col-span-1 flex items-center">
-                        <select name="companies" id="companies" class="w-full border rounded-md py-2 px-3">
+                        <select name="company" id="company" class="w-full border rounded-md py-2 px-3">
                             @foreach ($companies as $company)
                                 <option value="{{ $company->name }}">{{ $company->name }}</option>
                             @endforeach
@@ -140,6 +143,7 @@
                     <label for="pdf" class="block font-bold mb-2">PDF</label>
                     <input type="file" name="pdf" id="pdf" class="w-full border rounded-md py-2 px-3">
                 </div>
+
             </div>
             <button type="submit" class="mt-4 inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
                 Add Product
@@ -162,27 +166,16 @@
             });
         @elseif(session('danger_message'))
             Swal.fire({
-                title: 'Done!',
+                title: 'Error!',
                 text: '{{session('danger_message') }}',
                 icon: 'error',
-                timer: 4000,
+                timer: 6000,
                 showCancelButton: false,
                 confirmButtonColor: '#3085d6',
                 cancelButtonColor: '#d33',
             });
         @endif
 
-        @if(session('cancel_message'))
-            Swal.fire({
-                title: 'Action Cancelled!',
-                text: '',
-                icon: 'error',
-                timer: 3000,
-                showCancelButton: false,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-            });
-        @endif
     </script>
 
     {{-- Description Quill --}}
@@ -248,5 +241,4 @@
             }
         });
     </script>
-
 </x-app-layout>

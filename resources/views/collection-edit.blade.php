@@ -29,8 +29,10 @@
             </nav>
         </div>
     </x-slot>
+
     <div class="container mx-auto px-4 py-8">
         <div class="bg-white shadow-md rounded-lg flex flex-col md:flex-row px-8 py-6">
+
             {{-- IMAGES --}}
             <div class="grid grid-cols-3 gap-4">
                 @foreach ($imagePaths as $imagePath)
@@ -45,18 +47,21 @@
                     <form method="POST" action="{{ route('collection.update', ['id' => $mannequin->id]) }}" enctype="multipart/form-data">
                         @csrf
                         @method('PUT')
+                        {{-- Purchase Order --}}
                         <div class="flex">
                             <div class="w-1/3 font-bold font-bold">Purchase Order:</div>
                             <div class="w-2/3">
                                 <input type="text" name="po" value="{{ $mannequin->po }}" class="border rounded p-1 w-full">
                             </div>
                         </div>
+                        {{-- Item Reference --}}
                         <div class="flex">
                             <div class="w-1/3 font-bold font-bold">Item Reference:</div>
                             <div class="w-2/3">
                                 <input type="text" name="itemref" value="{{ $mannequin->itemref }}" class="border rounded p-1 w-full">
                             </div>
                         </div>
+
                         {{-- Company --}}
                         <div class="col-span-2 sm:col-span-1">
                             <label for="company" class="block font-bold mb-2">Company:</label>
@@ -68,6 +73,7 @@
                                 </select>
                             </div>
                         </div>
+
                         {{-- CATEGORY --}}
                         <div class="col-span-2 sm:col-span-1">
                             <label for="category" class="block font-bold mb-2">Category:</label>
@@ -79,6 +85,7 @@
                                 </select>
                             </div>
                         </div>
+
                         {{-- TYPE --}}
                         <div class="col-span-2 sm:col-span-1">
                             <label for="type" class="block font-bold mb-2">Type:</label>
@@ -90,6 +97,7 @@
                                 </select>
                             </div>
                         </div>
+
                         {{-- PRICE --}}
                         <div class="col-span-2 sm:col-span-1">
                             <div class="w-1/3 font-bold font-bold">Price:</div>
@@ -109,7 +117,6 @@
                         </div>
 
                         {{-- UPLOAD FILES --}}
-
                         {{-- IMAGES --}}
                         <div class="w-full">
                             <label class="block font-bold mb-2">Images</label>
@@ -165,6 +172,8 @@
         </div>
     </div>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    {{-- Sweet Alert --}}
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
     <script>
         $('form').submit(function(event) {
@@ -194,47 +203,7 @@
         });
     });
     </script>
-    {{-- <script src="{{ asset('js/main.js') }}"></script> --}}
-    <script>
-        //magnifier should disappear when outside border
-        $(document).ready(function() {
-            const imageThumbnails = $('.zoomable-image');
-            const mainImage = $('#mainImage');
-            let magnifierActive = false; // Keep track of magnifier statee
 
-            imageThumbnails.on('click', function() {
-                const imageIndex = $(this).data('image-index');
-                const imagePath = $(this).find('img').attr('src');
-                mainImage.attr('src', imagePath);
-
-                // Disable the magnifier when switching to a new image
-                disableMagnifier();
-            });
-
-            function disableMagnifier() {
-                magnifierActive = false;
-                const glass = $('.img-magnifier-glass'); // Store the magnifier glass element
-                glass.hide();
-            }
-
-            // Add click handler for the main image to toggle the magnifier
-            mainImage.on('click', function() {
-                if (magnifierActive) {
-                    disableMagnifier();
-                } else {
-                    magnifierActive = true;
-                    setupMagnifier("mainImage", 2);
-                }
-            });
-
-            // Add mouseleave event on the container of the main image to hide the magnifier
-            mainImage.parent().on('mouseleave', function() {
-                if (magnifierActive) {
-                    disableMagnifier();
-                }
-            });
-        });
-    </script>
     {{-- Description Quill --}}
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <script>
@@ -258,4 +227,5 @@
             document.querySelector('#description').value = editorContent;
         });
     </script>
+
 </x-app-layout>

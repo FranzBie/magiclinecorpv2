@@ -8,10 +8,11 @@
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                 {{ __('Product') }}
             </h2>
-            {{-- BUTTONS --}}
+
+            {{-- Admin Buttons(Add Products, Type, Category) --}}
             <div class="flex items-center space-x-2">
-                @can('add-product', Auth::user())
-                    {{-- buttons for add --}}
+                {{-- Access for buttons --}}
+                @can('admin_access', Auth::user())
                     <a href="{{ route('collection.add') }}" class="text-gray-800 hover:text-gray-600">
                         <i class="fas fa-plus-circle"></i> Add Product
                     </a>
@@ -22,8 +23,9 @@
                         <i class="fas fa-tags"></i> Add Type
                     </a>
                 @endcan
-                @can('edit-delete', Auth::user())
-                    {{-- trashcan button --}}
+
+                @can('super_admin', Auth::user())
+                    {{-- Trashcan Button --}}
                     @if ($mannequins->contains('activeStatus', 0))
                         <div class="ml-2">
                             <a href="{{ route('collection.trashcan') }}" class="text-gray-800 hover:text-gray-600">
@@ -33,6 +35,7 @@
                         </div>
                     @endif
                 @endcan
+
             </div>
         </div>
     </x-slot>
@@ -45,9 +48,11 @@
                     <div class="flex items-center mb-2">
                         <h1 class="text-2xl font-bold"><i class="fas fa-list-alt"></i> Product List</h1>
                     </div>
+
                     {{-- Add this line to include the CSRF token for DataTables AJAX requests --}}
                     <meta name="csrf-token" content="{{ csrf_token() }}">
                     <div class="overflow-x-auto">
+
                         {{-- FILTER --}}
                         <div class="flex space-x-4 mt-4">
                             {{-- category --}}
@@ -62,12 +67,13 @@
                             {{-- company --}}
                             <div class="filter-dropdown">
                                 <select id="companyFilter" class="block w-52 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Filter by Company">
-                                    <option value="">Companies </option>
+                                    <option value="">All Companies</option>
                                     @foreach ($companies as $company)
-                                        <option value="{{ $company->name }}"> {{ $company->name }} </option>
+                                        <option value="{{ $company->name }}" @if ($companyName == $company->name) selected @endif>{{ $company->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
+
                         </div>
 
                         {{-- TABLE --}}
@@ -115,12 +121,12 @@
                                                         <i class="fas fa-eye"></i> View
                                                     </a>
                                                     {{-- Admin --}}
-                                                    @can('edit-product', $mannequin)
+                                                    @can('admin_access', $mannequin)
                                                     <a href="{{ route('collection.edit', ['id' => $mannequin->id]) }}" class="btn-view">
                                                         <i class="fas fa-edit"></i> Edit
                                                     </a>
                                                     @endcan
-                                                    @can('edit-delete', $mannequin)
+                                                    @can('super_admin', $mannequin)
                                                     <button class="btn-delete" data-id="{{ $mannequin->id }}" data-transfer-url="{{ route('collection.trash', ['id' => $mannequin->id]) }}">
                                                         <i class="fas fa-trash-alt"></i> Delete
                                                     </button>
@@ -137,6 +143,7 @@
                             </tbody>
                         </table>
                         {{-- END TABLE --}}
+
                     </div>
                 </div>
             </div>
@@ -154,6 +161,7 @@
             var table = $('#mannequinsTable').DataTable({
                 lengthChange: false,
             });
+
             // Handle "select all" checkbox
             $('#selectAllCheckbox').on('change', function() {
                 var isChecked = this.checked;
@@ -161,6 +169,7 @@
                     this.checked = isChecked;
                 });
             });
+
             // Handle category filter change
             $('#categoryFilter').on('change', function() {
                 var category = $(this).val();
@@ -168,6 +177,7 @@
                     .search(category)
                     .draw();
             });
+
             // Handle company filter change
             $('#companyFilter').on('change', function() {
                 var company = $(this).val();
@@ -175,6 +185,10 @@
                     .search(company)
                     .draw();
             });
+
+            // Trigger initial filter changes after DataTable initializes(from dashboard)
+            $('#categoryFilter').trigger('change');
+            $('#companyFilter').trigger('change');
         });
     </script>
 
@@ -194,20 +208,8 @@
             });
         @elseif(session('danger_message'))
             Swal.fire({
-                title: 'Done!',
+                title: 'Error!',
                 text: '{{session('danger_message') }}',
-                icon: 'error',
-                timer: 3000,
-                showCancelButton: false,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-            });
-        @endif
-
-        @if(session('cancel_message'))
-            Swal.fire({
-                title: 'Action Cancelled!',
-                text: '',
                 icon: 'error',
                 timer: 3000,
                 showCancelButton: false,

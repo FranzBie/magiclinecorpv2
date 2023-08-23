@@ -46,6 +46,7 @@
                             <option value="1">Admin 1</option>
                             <option value="2">Admin 2</option>
                             <option value="3">Viewer</option>
+                            <option value="4">Owner</option>
                         </select>
                     </div>
 
@@ -109,9 +110,11 @@
                                     <td class="px-4 py-2 border">{{ $user->name }}</td>
                                     <td class="px-4 py-2 border">
                                         @if ($user->status == 1)
-                                            Super Admin / Admin 1
+                                            Admin 1 / Super Admin
                                         @elseif ($user->status == 2)
                                             Admin 2
+                                        @elseif ($user->status == 4)
+                                            Owner
                                         @else
                                             Viewer
                                         @endif

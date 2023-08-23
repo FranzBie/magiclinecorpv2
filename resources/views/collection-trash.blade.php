@@ -23,6 +23,7 @@
             </nav>
         </div>
     </x-slot>
+
     <div class="py-2">
         <div class="max-w-7xl mx-auto sm:px-3 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mt-4">
@@ -42,7 +43,6 @@
                                 <th class="px-4 py-2 border">Category</th>
                                 <th class="px-4 py-2 border">Type</th>
                                 <th class="px-4 py-2 border">Added By</th>
-                                {{-- <th class="px-4 py-2">Modified By</th> --}}
                             </tr>
                         </thead>
                         <tbody>
@@ -128,18 +128,6 @@
             Swal.fire({
                 title: 'Done!',
                 text: '{{session('danger_message') }}',
-                icon: 'error',
-                timer: 3000,
-                showCancelButton: false,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-            });
-        @endif
-
-        @if(session('cancel_message'))
-            Swal.fire({
-                title: 'Action Cancelled!',
-                text: '',
                 icon: 'error',
                 timer: 3000,
                 showCancelButton: false,

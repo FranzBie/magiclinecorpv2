@@ -9,12 +9,10 @@ class AdminAccessMiddleware
 {
     public function handle(Request $request, Closure $next)
     {
-        $user = $request->user();
-
-        if ($user && ($user->status == 1 || $user->status == 2)) {
+        if (auth()->user()->status == 1) {
             return $next($request);
         }
 
-        abort(403, 'Unauthorized');
+        return redirect('/dashboard')->with('danger_message', 'You do not have permission to access this content.');
     }
 }

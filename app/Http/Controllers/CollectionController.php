@@ -18,6 +18,7 @@ use Livewire\WithPagination;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 use DataTables;
 
@@ -29,26 +30,25 @@ class CollectionController extends Controller
     public function __construct()
     {
         // Define gates here
-        Gate::define('add-product', function ($user) {
+        Gate::define('admin_access', function ($user) {
             return in_array($user->status, [1, 2]);
         });
-        Gate::define('edit-product', function ($user) {
-            return in_array($user->status, [1, 2]);
+        Gate::define('super_admin', function ($user) {
+            return in_array($user->status, [1, 4]);
         });
-        Gate::define('edit-delete', function ($user) {
-            return in_array($user->status, [1]);
+        Gate::define('owner', function ($user) {
+            return in_array($user->status, [4]);
         });
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $user = Auth::user(); // Assuming you are using the built-in Auth facade
-        // dd($user->status);
+        $user = Auth::user();
         if (!$user) {
-            // User is not authenticated, redirect to login page
             return redirect()->route('login');
         }
         $categories = Category::all();
+        $selectedCompany = $request->query('company', '');
         // $companies = Company::all(); // Fetch all companies
 
         if ($user->status == 1) {
@@ -63,11 +63,11 @@ class CollectionController extends Controller
             'categories' => $categories,
             'mannequins' => $mannequins,
             'companies' => $companies,
+            'companyName' => $selectedCompany,
         ]);
     }
 
-
-    //addedBy
+    //AddedBy User
     private function setActionBy($model, $action)
     {
         if (Auth::check()) {
@@ -93,50 +93,7 @@ class CollectionController extends Controller
 
         // }
 
-    // VIEW MODULE FOR ADD PRODUCT
-    public function add()
-    {
-        $user = Auth::user(); // Assuming you are using the built-in Auth facade
-        $types = Type::all();
-        $categories = Category::all();
-        if ($user->status == 1) {
-            $companies = Company::all();
-        } else {
-            $companies= Mannequin::whereIn('company', $user->companies->pluck('name'))->get();
-            $companies = $user->companies;
-        }
-        return view('collection-add')->with(['categories' => $categories, 'types' => $types, 'companies' => $companies]);
-    }
-
-    //View selected product for editing
-    public function edit($id)
-    {
-        $user = Auth::user();
-        $categories = Category::all();
-        if ($user->status == 1) {
-            $companies = Company::all();
-        } else {
-            $companies= Mannequin::whereIn('company', $user->companies->pluck('name'))->get();
-            $companies = $user->companies;
-        }
-        $types = Type::all();
-        $mannequin = Mannequin::find($id);
-        if (!$mannequin) {
-            return redirect()->route('collection')->with('danger_message', 'Mannequin not found.');
-        }
-
-        // Return the view with the mannequin data
-        // return view('collection-edit')->with('mannequin', $mannequin);
-        return view('collection-edit')->with([
-            'categories' => $categories,
-            'mannequin' => $mannequin,
-            'types' => $types,
-            'companies' => $companies,
-        ]);
-    }
-
-    // View selected Product
-
+    // VIEW PRODUCT
     public function view($encryptedId)
     {
         try {
@@ -161,68 +118,98 @@ class CollectionController extends Controller
             'canViewPrice' => $canViewPrice,
         ]);
     }
+
+    // VIEW MODULE FOR ADD PRODUCT
+    public function add()
+    {
+        $user = Auth::user(); // Assuming you are using the built-in Auth facade
+        $types = Type::all();
+        $categories = Category::all();
+        if ($user->status == 1 || $user->status == 4) {
+            $companies = Company::all();
+        } else {
+            $companies= Mannequin::whereIn('company', $user->companies->pluck('name'))->get();
+            $companies = $user->companies;
+        }
+
+        return view('collection-add')->with(['categories' => $categories, 'types' => $types, 'companies' => $companies]);
+    }
+
     // ADD PRODUCT
     public function store(Request $request)
     {
+        $validator = Validator::make($request->all(), [
+            'po' => 'nullable|string|max:255',
+            'itemRef' => 'required|string|max:255',
+            'company' => 'nullable|string|max:255',
+            'category' => 'nullable|string|max:255',
+            'type' => 'nullable|string|max:255',
+            'price' => 'nullable|numeric',
+            'description' => 'nullable',
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
+            'file' => 'nullable|mimes:xlsx,xls|max:2048',
+            'pdf' => 'nullable|mimes:pdf|max:2048',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect('/collection-add')->with('danger_message', 'Input Incorrect/Files Too Large: Please check the form fields and try again.')
+                ->withErrors($validator)
+                ->withInput();
+        }
+
         $photoPaths = [];
-        // Check if there are uploaded files
+        $excelFileName = null;
+        $pdfFileName = null;
+
+        // Optimize image upload
         if ($request->hasFile('images')) {
-            $photos = $request->file('images');
-
-            foreach ($photos as $photo) {
+            foreach ($request->file('images') as $photo) {
                 $photoName = time() . '_' . $photo->getClientOriginalName();
-                $photo->storeAs('public/images/product/', $photoName);
-
-                // Update the $photoPaths array with the path to each uploaded photo
                 $photoPaths[] = 'images/product/' . $photoName;
+                $photo->storeAs('public/images/product/', $photoName);
             }
         }
-         // File upload logic for Excel file ('file')
-        if ($request->hasFile('file')) {
-            $excelFile = $request->file('file');
-            $excelFileName = time() . '_' . $excelFile->getClientOriginalName();
-            $excelFile->storeAs('public/files/excel/', $excelFileName);
-        }
 
-        // File upload logic for PDF file ('pdf')
-        if ($request->hasFile('pdf')) {
-            $pdfFile = $request->file('pdf');
-            $pdfFileName = time() . '_' . $pdfFile->getClientOriginalName();
-            $pdfFile->storeAs('public/files/pdf/', $pdfFileName);
-        }
+        // Optimize file upload
+        $uploadFile = function ($fileType, $fileKey, $pathPrefix) use ($request) {
+            if ($request->hasFile($fileKey)) {
+                $file = $request->file($fileKey);
+                $fileName = time() . '_' . $file->getClientOriginalName();
+                $file->storeAs('public/files/' . $pathPrefix, $fileName);
+                return 'files/' . $pathPrefix . $fileName;
+            }
+            return null;
+        };
+
+        $excelFileName = $uploadFile('file', 'file', 'excel/');
+        $pdfFileName = $uploadFile('pdf', 'pdf', 'pdf/');
 
         // Create a new Mannequin instance and set its properties
-        $mannequin = new Mannequin();
-        $mannequin->po = strtoupper($request->po);
-        $mannequin->itemref = strtoupper($request->itemRef);
-        $mannequin->company = strtoupper($request->company);
-        $mannequin->category = strtoupper($request->category);
-        $mannequin->type = strtoupper($request->type);
-        $mannequin->price = ($request->price);
-        $mannequin->description = ($request->description);
+        $mannequin = new Mannequin([
+            'po' => strtoupper($request->po),
+            'itemref' => strtoupper($request->itemRef),
+            'company' => strtoupper($request->company),
+            'category' => strtoupper($request->category),
+            'type' => strtoupper($request->type),
+            'price' => $request->price,
+            'description' => $request->description,
+        ]);
+
         $this->setActionBy($mannequin, 'Added');
         $mannequin->activeStatus = "1";
 
-        // Set the photo paths if there are uploaded photos
         if (!empty($photoPaths)) {
-            $mannequin->images = implode(',', $photoPaths); // Save multiple image paths as a comma-separated string
+            $mannequin->images = implode(',', $photoPaths);
         }
 
-        // $mannequin->file = ($request->file);//excel file costing
-        // $mannequin->pdf = ($request->pdf);
-
-        // Set the 'file' property if an Excel file was uploaded
-        if (isset($excelFileName)) {
-            $mannequin->file = 'files/excel/' . $excelFileName;
+        if ($excelFileName !== null) {
+            $mannequin->file = $excelFileName;
         }
 
-        // Set the 'pdf' property if a PDF file was uploaded
-        if (isset($pdfFileName)) {
-            $mannequin->pdf = 'files/pdf/' . $pdfFileName;
+        if ($pdfFileName !== null) {
+            $mannequin->pdf = $pdfFileName;
         }
-        //3D file tbd
 
-        // Save the data to the database
         if ($mannequin->save()) {
             return redirect('/collection')->with('success_message', 'Collection has been successfully added!');
         } else {
@@ -230,9 +217,37 @@ class CollectionController extends Controller
         }
     }
 
+    //View selected product for editing
+    public function edit($id)
+    {
+        $user = Auth::user();
+        $categories = Category::all();
+        if ($user->status == 1 || $user->status == 4) {
+            $companies = Company::all();
+        } else {
+            $companies= Mannequin::whereIn('company', $user->companies->pluck('name'))->get();
+            $companies = $user->companies;
+        }
+        $types = Type::all();
+        $mannequin = Mannequin::find($id);
+        if (!$mannequin) {
+            return redirect()->route('collection')->with('danger_message', 'Mannequin not found.');
+        }
+
+        // Return the view with the mannequin data
+        // return view('collection-edit')->with('mannequin', $mannequin);
+        return view('collection-edit')->with([
+            'categories' => $categories,
+            'mannequin' => $mannequin,
+            'types' => $types,
+            'companies' => $companies,
+        ]);
+    }
+
     //EDIT Product
     public function update(Request $request, $id)
     {
+        $user = Auth::user();
         // Find the Mannequin by ID or throw a 404 error if not found
         $mannequin = Mannequin::findOrFail($id);
 
@@ -314,7 +329,20 @@ class CollectionController extends Controller
         // $activity = "Updated $originalItemref"; // Concatenate the activity
         // $this->logAuditTrail(auth()->user(), $activity, $originalItemref);
 
-        return redirect()->route('collection', $mannequin->id)->with('success_message', 'Product details updated successfully.');
+        if($user->status == 4){
+            return redirect()->route('dashboard', $mannequin->id)->with('success_message', 'Product details updated successfully.');
+        }
+        else{
+            return redirect()->route('collection', $mannequin->id)->with('success_message', 'Product details updated successfully.');
+        }
+
+    }
+
+    //SHOW TRASHCAN
+    public function trashcan()
+    {
+        $mannequins = Mannequin::where('activeStatus', '<', 1)->get();
+        return view('collection-trash')->with(['mannequins' => $mannequins,]);;
     }
 
     //DELETE(to trashcan make active status = 0)
@@ -352,14 +380,7 @@ class CollectionController extends Controller
         return redirect()->back()->with('success_message', 'Item deleted permanently.');
     }
 
-    //SHOW TRASHCAN
-    public function trashcan()
-    {
-        $mannequins = Mannequin::where('activeStatus', '<', 1)->get();
-        return view('collection-trash')->with(['mannequins' => $mannequins,]);;
-    }
-
-    //RESTORE
+    //RESTORE trashed prod(active status = 1 again)
     public function restore($id)
     {
         $mannequin = Mannequin::findOrFail($id);
@@ -379,13 +400,6 @@ class CollectionController extends Controller
     {
         $categories = Category::all();
         return view('collection-category')->with(['categories' => $categories]);
-    }
-
-    // SHOW TYPE MODULE
-    public function type()
-    {
-        $types = Type::all();
-        return view('collection-type')->with(['types' => $types]);
     }
 
     // ADD CATEGORY
@@ -414,6 +428,13 @@ class CollectionController extends Controller
 
 
         return redirect()->route('collection.category')->with('success_message', 'Category added successfully!');
+    }
+
+    // SHOW TYPE MODULE
+    public function type()
+    {
+        $types = Type::all();
+        return view('collection-type')->with(['types' => $types]);
     }
 
     // ADD TYPE

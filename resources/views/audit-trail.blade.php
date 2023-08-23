@@ -42,7 +42,7 @@
         $(document).ready(function() {
             var table = $('#auditTrailTable').DataTable({
                 lengthChange: false,
-                order: [[3, "asc"]] // Set default sorting order for timestamp column (index 2) to ascending
+                order: [[3, "desc"]] // Set default sorting order for timestamp column (index 2) to ascending
             });
         });
     </script>
