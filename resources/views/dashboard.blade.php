@@ -58,7 +58,7 @@
                     @endcan
                     {{-- owner shows table below --}}
                     @can('owner', Auth::user())
-                    <a href="#" id="showTableButton" class="companyFilter show-table-button block text-center relative overflow-hidden group" data-company="{{ $company->name }}" onclick="scrollToElement('mannequinsTable')">{{-- {{ route('collection', ['company' => $company->name]) }} --}}
+                    <a href="#" id="showTableButton" class="companyFilter show-table-button block text-center relative overflow-hidden group" data-company="{{ $company->name }}">{{-- {{ route('collection', ['company' => $company->name]) }} --}}
                     @endcan
                         <!-- Content for the first square -->
                         <div class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap bg-gray-50 dark:text-white dark:bg-gray-800 rounded-md">
@@ -96,7 +96,7 @@
                 {{-- USERS --}}
                 @can('super_admin', Auth::user())
                 <div class="w-full sm:w-1/5 p-4 ">
-                    <a href="#" class="block text-center relative overflow-hidden group">
+                    <a href="users" class="block text-center relative overflow-hidden group">
                         <!-- Content for the first square -->
                         <div class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap bg-gray-50 dark:text-white dark:bg-gray-800 rounded-md">
                             <div class="relative">
@@ -131,16 +131,43 @@
 
                 {{-- TABLE (for owner) --}}
                 @can('owner', Auth::user())
-                <div id="tableContainer" class="w-full sm:w-full p-4" style="display: none;">
+                <div id="tableContainer" class="bg-white overflow-hidden shadow-sm sm:rounded-lg w-full sm:w-full p-4" style="display: none;">
 
-                    {{-- company FILTER--}}
-                    <div class="filter-dropdown">
-                        <select id="companyFilter" class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Filter by Company">
-                            <option value="">All Companies</option>
-                            @foreach ($companies as $company)
-                                <option value="{{ $company->name }}">{{ $company->name }}</option>
-                            @endforeach
-                        </select>
+                    <div class="flex space-x-4 mb-4">
+                        {{-- company FILTER --}}
+                        <div class="filter-dropdown flex-1">
+                            <select id="companyFilter" class="w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Filter by Company">
+                                <option value="">All Companies</option>
+                                @foreach ($companies as $company)
+                                    <option value="{{ $company->name }}">{{ $company->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        {{-- category FILTER --}}
+                        <div class="filter-dropdown flex-1">
+                            <select id="categoryFilter" class="w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Filter by Category">
+                                <option value="">Categories</option>
+                                @foreach ($categories as $category)
+                                    <option value="{{ $category->name }}">{{ $category->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        {{-- Searchbox --}}
+                        <div class="w-1/2">
+                            <input id="customSearchInput" type="text" class="w-full px-4 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="Search...">
+                        </div>
+
+                        {{-- Trashcan Button --}}
+                        @if ($mannequins->contains('activeStatus', 0))
+                            <div class="pt-2">
+                                <a href="{{ route('collection.trashcan') }}" class="text-gray-800 hover:text-gray-600">
+                                    <i class="fas fa-trash-alt"></i> Trash
+                                    <span class="badge">{{ $mannequins->where('activeStatus', 0)->count() }}</span>
+                                </a>
+                            </div>
+                        @endif
                     </div>
 
                     {{-- TABLE --}}
@@ -191,6 +218,9 @@
                                                 <a href="{{ route('collection.edit', ['id' => $mannequin->id]) }}" class="btn-view">
                                                     <i class="fas fa-edit"></i> Edit
                                                 </a>
+                                                <button class="btn-delete"data-transfer-url="{{ route('collection.trash', ['id' => $mannequin->id]) }}">
+                                                    <i class="fas fa-trash-alt"></i> Delete
+                                                </button>
                                             </div>
                                         </td>
                                         <td class="px-4 py-2 border">{{ $mannequin->company }}</td>
@@ -205,11 +235,11 @@
                 {{-- END TABLE --}}
                 </div>
                 @endcan
+
             </div>
         </div>
     </div>
 
-    <!-- Scripts -->
     {{-- datables --}}
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.11.3/js/jquery.dataTables.min.js"></script>
@@ -217,58 +247,63 @@
         $(document).ready(function() {
             var table = $('#mannequinsTable').DataTable({
                 lengthChange: false,
+                "dom": 'lrtip'
             });
 
             // Handle company filter(ON TOP OF TABLE)
             $('#companyFilter').on('change', function() {
                 var company = $(this).val();
-                table.column(3) // company column index (0-based)
-                    .search(company)
-                    .draw();
+                table.column(3).search(company).draw();
             });
 
-            // showAllProducts
+            // Handle category filter change(on table)
+            $('#categoryFilter').on('change', function() {
+                var category = $(this).val();
+                table.column(4).search(category).draw();
+            });
+
+            // Show All Products button
             $('.showAllProducts').on('click', function(event) {
                 event.preventDefault();
-                $('#tableContainer').show(); // Show the table container
-
-                // Clear existing search/filtering and draw the original table
+                $('#tableContainer').show();
                 table.search('').columns().search('').draw();
-
                 $('#companyFilter').val('');
-
-                // Scroll to the table container
+                $('#customSearchInput').val(''); // Clear custom search input
                 scrollToElement('tableContainer');
             });
 
-           // Handle company filter change
+              // Handle "select all" checkbox
+              $('#selectAllCheckbox').on('change', function() {
+                var isChecked = this.checked;
+                $('td input.row-checkbox').each(function() {
+                    this.checked = isChecked;
+                });
+            });
+
+            // Company Filter links
             $('.companyFilter').on('click', function(event) {
                 event.preventDefault();
-
                 var company = $(this).data('company');
-
-                // Clear existing search and apply new company filter
-                table.search('').draw(); // Clear previous search
-                table.column(3) // Company column index
-                    .search(company)
-                    .draw();
-
-                // Update the company filter dropdown's selected value
+                table.search('').draw();
+                table.column(3).search(company).draw();
                 $('#companyFilter').val(company);
-
-                // Scroll to the table container
+                $('#customSearchInput').val(''); // Clear custom search input
                 scrollToElement('tableContainer');
             });
 
-            // Show table
+            // Show Table button
             $('.show-table-button').on('click', function(event) {
                 event.preventDefault();
-                $('#tableContainer').show(); // Show the table container
-
-                // Scroll to the table container
+                $('#tableContainer').show();
                 scrollToElement('tableContainer');
             });
 
+            // Custom search input handler using input event
+            $('#customSearchInput').keyup(function(){
+            table.search( $(this).val() ).draw() ;
+            })
+
+            // Scroll function
             function scrollToElement(elementId) {
                 const element = document.getElementById(elementId);
                 if (element) {
@@ -303,5 +338,52 @@
                 cancelButtonColor: '#d33',
             });
         @endif
+    </script>
+    {{-- Sweet Alert for Delete --}}
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const deleteButtons = document.querySelectorAll('.btn-delete');
+
+            deleteButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const recordId = this.getAttribute('data-id');
+                    const transferUrl = this.getAttribute('data-transfer-url');
+
+                    Swal.fire({
+                        title: 'Are you sure?',
+                        text: 'You won\'t be able to revert this!',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#3085d6',
+                        cancelButtonColor: '#d33',
+                        confirmButtonText: 'Yes, delete it!'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            // Perform AJAX request to delete the record
+                            axios.post(transferUrl)
+                                 .then(response => {
+                                     if (response.data.success) {
+                                         Swal.fire(
+                                             'Deleted!',
+                                             'Your record has been deleted.',
+                                             'success'
+                                         ).then(() => {
+                                             // Refresh the page after successful deletion
+                                             window.location.reload();
+                                         });
+                                     }
+                                 })
+                            .catch(error => {
+                                Swal.fire(
+                                    'Error!',
+                                    'An error occurred while deleting the record.',
+                                    'error'
+                                );
+                            });
+                        }
+                    });
+                });
+            });
+        });
     </script>
 </x-app-layout>

@@ -39,6 +39,9 @@ class CollectionController extends Controller
         Gate::define('owner', function ($user) {
             return in_array($user->status, [4]);
         });
+        Gate::define('users', function ($user) {
+            return in_array($user->status, [1, 2, 3]);
+        });
     }
 
     public function index(Request $request)
@@ -119,7 +122,7 @@ class CollectionController extends Controller
         // check if checkPrice of user has 1 on viewed product/mannequin
         $canViewPriceForCompany = $user->companies()->where('companies.id', $company_id)->where('company_user.checkPrice', 1)->exists();
 
-        if ($user->status == 1 || $canViewPriceForCompany) {
+        if ($user->status == 1 || $canViewPriceForCompany || $user->status == 4) {
             $canViewPrice = true;
         } else {
             $canViewPrice = false;
@@ -169,7 +172,7 @@ class CollectionController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return redirect('/collection-add')->with('danger_message', 'Input Incorrect/Files Too Large: Please check the form fields and try again.')
+            return redirect('/collection-add')->with('danger_message', 'Input Incorrect or Files Too Large(Max 2MB): Please check the form fields and try again.')
                 ->withErrors($validator)
                 ->withInput();
         }
@@ -446,6 +449,19 @@ class CollectionController extends Controller
 
         return redirect()->route('collection.category')->with('success_message', 'Category added successfully!');
     }
+
+    //Delete Category(PERMANENTLY)
+    public function trash_category($id)
+    {
+        $category = Category::findOrFail($id);
+        // Perform any additional tasks related to deletion, if needed
+
+        // Delete the category
+        $category->delete();
+
+        return response()->json(['success' => true]);
+    }
+
 
     // SHOW TYPE MODULE
     public function type()
