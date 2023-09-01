@@ -9,8 +9,12 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Support\Facades\Str;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Validator;
 
 class UsersController extends Controller
 {
@@ -35,49 +39,70 @@ class UsersController extends Controller
         }
     }
 
-    //add user
+    // Add user
     public function store(Request $request)
     {
-        try {
-            $user = Auth::user();
-            $addedByInfo = $this->getAddedByInfo('Added', $user);
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'username' => 'required|string|max:255|unique:users',
+            'email' => 'required|string|email|max:255|unique:users',
+            'password' => 'required|string|confirmed',
+            'status' => 'required|in:1,2,3,4',
+        ]);
+        if ($validator->fails()) {
+            $errors = $validator->errors()->all();
 
-            // Create user
-            $user = User::create([
-                'name' => $request->name,
-                'username' => $request->username,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-                'status' => $request->status,
-                'activeStatus' => "1",
-                'addedBy' => $addedByInfo,
-            ]);
+            return redirect('/users')
+                ->with('validation_errors', $errors)
+                ->withInput()
+                ->with('danger_message', 'Input Incorrect: Please check the form fields and try again.');
+        }
 
-            // Check user creation and handle accordingly
-            if (!$user) {
-                throw new \Exception('Failed to create user');
-            }
+        $user = Auth::user();
+        $addedByInfo = $this->getAddedByInfo('Added', $user);
 
-            // Handle different user statuses
-            if ($request->status == 1 || $request->status == 4)
-            {
-                return redirect()->route('users')->with('success_message', 'User created successfully.');
-            }
-            else
-            {
-                // Attach selected companies to the user
-                $user->companies()->attach($request->input('company_ids'));
+        // Create user
+        $user = User::create([
+            'name' => $request->name,
+            'username' => $request->username,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'status' => $request->status,
+            'activeStatus' => "1",
+            'addedBy' => $addedByInfo,
+        ]);
 
-                // Update checkPrice value for each selected company (company_user table)
-                foreach ($request->input('selected_company_ids') as $companyId) {
-                    $user->companies()->updateExistingPivot($companyId, ['checkPrice' => 1]);
+        // Check user creation and handle accordingly
+        if (!$user) {
+            throw new \Exception('Failed to create user');
+        }
+
+        // Handle different user statuses
+        if ($request->status == 1 || $request->status == 4)
+        {
+            // User status is admin or owner, so redirect with success message
+            return redirect()->route('users')->with('success_message', 'User created successfully.');
+        }
+        else
+        {
+            // Attach selected companies to the user
+            $attachedCompanies = $user->companies()->attach($request->input('company_ids'));
+
+            // Get selected company IDs for price access
+            $selected_company_ids = $request->input('selected_company_ids');
+
+            // Update checkPrice for selected companies if $selected_company_ids is not null
+            if ($selected_company_ids !== null) {
+                $companies = Company::whereIn('id', $selected_company_ids)->get();
+
+                foreach ($companies as $company) {
+                    // Update checkPrice for the current company
+                    $user->companies()->updateExistingPivot($company, ['checkPrice' => 1]);
                 }
-
-                return redirect()->route('users')->with('success_message', 'User created successfully.');
             }
-        } catch (\Exception $e) {
-            // Handle the error by redirecting back with an error message
-            return redirect()->back()->with('danger_message', 'Failed to create user. Please try again.');
+
+            // Redirect with success message
+            return redirect()->route('users')->with('success_message', 'User created successfully.');
         }
     }
 
@@ -121,6 +146,31 @@ class UsersController extends Controller
             return response()->json(['success' => true]);
         }
         return redirect()->back()->with('danger_message', 'An error occurred while restoring the item.');
+    }
+
+    public function edit($encryptedId)
+    {
+        try {
+            // Decrypt the encrypted ID to get the original ID
+            $id = Crypt::decrypt($encryptedId);
+        } catch (DecryptException $e) {
+            // Redirect with an error message if decryption fails
+            return redirect()->route('users')->with('danger_message', 'Invalid URL.');
+        }
+
+        // Get the authenticated user
+        $user = Auth::user();
+
+        // Fetch the selected mannequin
+        $user = User::find($id);
+        $users = User::with('companies')->get();
+        $companies = Company::all();
+
+        // Return the view with the required data
+        return view('user-edit')->with([
+            'user' => $user,
+            'companies' => $companies,
+        ]);
     }
 
 }

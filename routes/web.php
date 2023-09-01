@@ -30,14 +30,21 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'admin-access'])->group(function () {
     // Only Admin 1 can access these routes(and owner i guess)
+    //Trashcan
+    Route::get('/collection-trash', [CollectionController::class, 'trashcan'])->name('collection.trashcan');//view trashcan view
+    Route::post('/collection/{id}', [CollectionController::class, 'trash'])->name('collection.trash');//change activeStatus of product/mannequin to 0
+    Route::get('collection/{id}', [CollectionController::class, 'restore'])->name('collection.restore');//change activeStatus of product/mannequin back to 1
+    Route::get('collection-delete/{id}', [CollectionController::class, 'destroy'])->name('collection.delete');//permanent delete
+    Route::post('/collection/trash-multiple', [CollectionController::class, 'trashMultiple'])->name('collection.trashMultiple');
+
     //users
     Route::get('/users', [UsersController::class, 'index'])->name('users');
     Route::post('/users-add', [UsersController::class, 'store'])->name('users.add');
     Route::post('/users-trash/{id}', [UsersController::class, 'trash'])->name('users.trash');
     Route::post('/users-restore/{id}', [UsersController::class, 'restore'])->name('users.restore');
+    Route::get('/users-edit/{encryptedId}', [UsersController::class, 'edit'])->name('users.edit');
     // Company
     Route::get('/company', [CompanyController::class, 'index'])->name('company');
-    Route::post('/add-company', [CompanyController::class, 'company'])->name('company.add');
     //Audit trail
     Route::get('/audit-trail', [AuditTrailController::class, 'index'])->name('audit-trail');
 });
@@ -65,12 +72,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/collection-edit/{id}', [CollectionController::class, 'edit'])->name('collection.edit');//go
     Route::put('/collection-update/{id}', [CollectionController::class, 'update'])->name('collection.update');
 
-    //Trashcan
-    Route::get('/collection-trash', [CollectionController::class, 'trashcan'])->name('collection.trashcan');//view trashcan view
-    Route::post('/collection/{id}', [CollectionController::class, 'trash'])->name('collection.trash');//change activeStatus of product/mannequin to 0
-    Route::get('collection/{id}', [CollectionController::class, 'restore'])->name('collection.restore');//change activeStatus of product/mannequin back to 1
-    Route::get('collection-delete/{id}', [CollectionController::class, 'destroy'])->name('collection.delete');//permanent delete
-
     // Category
     Route::get('/collection-category', [CollectionController::class, 'category'])->name('collection.category');
     Route::post('/collection-category', [CollectionController::class, 'store_category'])->name('collection.category.store');
@@ -79,10 +80,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     //Type
     Route::get('/collection-type', [CollectionController::class, 'type'])->name('collection.type');
     Route::post('/collection-type', [CollectionController::class, 'store_type'])->name('collection.type.store');
+    Route::post('/collection-type-trash/{id}', [CollectionController::class, 'trash_type'])->name('collection.type.trash');
 
     // // Company
     // Route::get('/company', [CompanyController::class, 'index'])->name('company');
     // Route::post('/add-company', [CompanyController::class, 'company'])->name('company.add');
+    Route::post('/add-company', [CompanyController::class, 'company'])->name('company.add');
+    Route::post('/trash-company/{id}', [CompanyController::class, 'trash'])->name('company.trash');
 
     //Users
     // Route::get('/users', [UsersController::class, 'index'])->name('users');

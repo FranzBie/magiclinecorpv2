@@ -34,7 +34,12 @@
                     {{-- Password --}}
                     <div class="mb-4">
                         <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-                        <input type="password" name="password" id="password" class="mt-1 p-2 border rounded-md w-full" required>
+                        <div class="relative">
+                            <input type="password" name="password" id="password" class="mt-1 p-2 border rounded-md w-full" required>
+                            <button type="button" id="togglePassword" class="absolute top-1/2 transform -translate-y-1/2 right-2" tabindex="-1">
+                                <i id="passwordIcon" class="fas fa-eye-slash text-gray-400 cursor-pointer"></i>
+                            </button>
+                        </div>
                     </div>
                     {{-- Confirm Pass --}}
                     <div class="mb-4">
@@ -58,14 +63,14 @@
                         {{-- COMPANY ACCESS --}}
                         <div id="companyAccessSection" class="flex-1">
                             <div class="mt-1">
-                                <div class="inline-flex items-center">
-                                    <label class="block text-sm font-medium text-gray-700 mr-2">Companies</label>
-                                    <label class="inline-flex items-center">
-                                        <input type="checkbox" id="select-all-companies" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
-                                        <span class="block text-sm font-medium text-gray-700 ml-2">Select All</span>
-                                    </label>
-                                </div>
+                                <label class="block text-sm font-medium text-gray-700 mr-2">Companies</label>
+                                {{-- Select all company/price access --}}
+                                <label class="inline-flex items-center">
+                                    <input type="checkbox" id="select-all-companies" class="rounded border-gray-300 font-medium text-indigo-600 shadow-sm focus:ring-indigo-500 mx-1">
+                                    <span class="block text-sm font-medium text-gray-700 ml-2">Select All</span>
+                                </label>
 
+                                {{-- Companies --}}
                                 @foreach ($companies as $company)
                                     <div class="w-auto">
                                         <label class="inline-flex">
@@ -74,12 +79,11 @@
                                         </label>
                                     </div>
                                 @endforeach
-
                             </div>
                         </div>
 
                         {{-- Price Access --}}
-                        <div id="companyAccessSection" class="flex-1">
+                        <div id="priceAccessSection" class="flex-1">
                             <div class="mt-1">
                                 <label class="block text-sm font-medium text-gray-700">Price Access</label>
                                 <div id="selected-companies">
@@ -90,7 +94,7 @@
                     </div>
 
                     <div class="mb-4">
-                        <button type="submit" class="mt-4 mb-10 inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                        <button type="submit" class="mt-4 inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
                             Register
                         </button>
                     </div>
@@ -118,7 +122,9 @@
                     <tbody>
                         @foreach ($users as $user)
                             <tr class="border">
+                                {{-- Name --}}
                                 <td class="px-4 py-2 border">{{ $user->name }}</td>
+                                {{-- Status --}}
                                 <td class="px-4 py-2 border" style="{{ $user->activeStatus == 0 ? 'color: red;' : '' }}">
                                     @if ($user->status == 1)
                                         Admin 1 / Super Admin
@@ -130,19 +136,24 @@
                                         Viewer
                                     @endif
                                 </td>
+                                {{-- Company --}}
                                 <td class="px-4 py-2 border">
                                     @if ($user->status == 1 || $user->status == 4)
                                         All
                                     @else
                                         @foreach ($user->companies as $company)
-                                            {{ $company->name }}
+                                            <span style="{{ $company->pivot->checkPrice == 1 ? 'color: green;' : '' }}">
+                                                {{ $company->name }}
+                                            </span>
                                             @unless($loop->last)
-                                            , {{-- Add a comma unless it's the last company --}}
+                                                , {{-- Add a comma unless it's the last company --}}
                                             @endunless
                                         @endforeach
                                     @endif
                                 </td>
+                                {{-- SetBy --}}
                                 <td class="px-4 py-2 border">{{ $user->addedBy }}</td>
+                                {{-- Action BUtton --}}
                                 <td class="px-4 py-2 border">
                                     {{-- If User is inactive --}}
                                     @if ($user->activeStatus == 0)
@@ -157,12 +168,18 @@
                                         </button>
                                     {{-- else --}}
                                     @else
-                                        {{-- <button class="btn-edit">
-                                            <i class="fas fa-edit"></i> Edit
-                                        </button> --}}
-                                        <button class="btn-delete" data-id="{{ $user->id }}" data-transfer-url="{{ route('users.trash', ['id' => $user->id]) }}">
-                                            <i class="fas fa-bullseye"></i> Deactivate
-                                        </button>
+                                        @if(auth()->check() && auth()->user()->id === $user->id)
+                                            <span class="btn-view">
+                                                Current User
+                                            </span>
+                                        @else
+                                            <a href="{{ route('users.edit', ['encryptedId' => Crypt::encrypt($user->id)]) }}" class="btn-view">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </a>
+                                            <button class="btn-delete" data-id="{{ $user->id }}" data-transfer-url="{{ route('users.trash', ['id' => $user->id]) }}">
+                                                <i class="fas fa-bullseye"></i> Deactivate
+                                            </button>
+                                        @endif
                                     @endif
                                 </td>
                             </tr>
@@ -196,20 +213,40 @@
         });
     </script>
 
-    {{-- script for company checkbox and price access --}}
+    {{-- Hard JS SCRIPTS --}}
     <script>
+        // Hard JS SCRIPTS
         document.addEventListener('DOMContentLoaded', function () {
+            // CHECKBOXES
             const selectAllCheckbox = document.getElementById('select-all-companies');
             const companyCheckboxes = document.querySelectorAll('.company-checkbox');
             const selectedCompaniesDiv = document.getElementById('selected-companies');
 
             // Checkbox hide for admin 1 and owner
             const companyAccessSection = document.getElementById('companyAccessSection');
+            const priceAccessSection = document.getElementById('priceAccessSection');
             const statusDropdown = document.getElementById('status');
 
+            // VIEW PASSWORD
+            const togglePassword = document.getElementById('togglePassword');
+            const passwordInput = document.getElementById('password');
+            const passwordIcon = document.getElementById('passwordIcon');
 
-            selectAllCheckbox.addEventListener('change', function ()
-            {
+            // TOGGLE PASSWORD
+            togglePassword.addEventListener('click', function () {
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    passwordIcon.classList.remove('fa-eye-slash');
+                    passwordIcon.classList.add('fa-eye');
+                } else {
+                    passwordInput.type = 'password';
+                    passwordIcon.classList.remove('fa-eye');
+                    passwordIcon.classList.add('fa-eye-slash');
+                }
+            });
+
+            // Handle select all checkboxes
+            selectAllCheckbox.addEventListener('change', function () {
                 const isChecked = selectAllCheckbox.checked;
 
                 companyCheckboxes.forEach(checkbox => {
@@ -218,25 +255,28 @@
                 });
             });
 
+            // Handle company checkboxes
             companyCheckboxes.forEach(checkbox => {
                 checkbox.addEventListener('change', () => {
                     handleSelectedCompany(checkbox);
                 });
             });
 
-            // WHEN COMPANY IS CHECKED IT WILL VIEW NEW CHECKBOX FOR PRICE ACCESS
-            function handleSelectedCompany(checkbox)
-            {
+            // Handle displaying selected companies for price access
+            function handleSelectedCompany(checkbox) {
+                const companyId = checkbox.value;
                 const companyName = checkbox.nextElementSibling.textContent.trim();
-                const selectedCompany = Array.from(selectedCompaniesDiv.children).find(el => el.querySelector('.text-gray-700').textContent === companyName);
+                const selectedCompany = Array.from(selectedCompaniesDiv.children).find(el => el.querySelector('.text-gray-700').textContent == companyName);
 
                 if (checkbox.checked) {
                     if (!selectedCompany) {
                         const newSelectedCompany = document.createElement('div');
-                        newSelectedCompany.classList.add('inline-flex', 'mb-1');
+                        newSelectedCompany.classList.add('flex', 'flex-col', 'mb-1'); // Use 'flex' and 'flex-col'
                         newSelectedCompany.innerHTML = `
-                            <input type="checkbox" name="selected_company_ids[]" value="1" class="selected-company-checkbox rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" checked>
-                            <span class="block text-sm font-medium text-gray-700 mx-2">${companyName}</span>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" name="selected_company_ids[]" value="${companyId}" class="selected-company-checkbox rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" checked>
+                                <span class="block text-sm font-medium text-gray-700 mx-2">${companyName}</span>
+                            </label>
                         `;
                         selectedCompaniesDiv.appendChild(newSelectedCompany);
                     }
@@ -247,19 +287,19 @@
                 }
             }
 
-            // FOR HIDING THE CHECKBOX WHEN ADMIN 1 or Owner is selected
-                statusDropdown.addEventListener('change', function() {
+            // Handle hiding sections based on user status
+            statusDropdown.addEventListener('change', function() {
                 const selectedStatus = this.value;
 
                 // Show/hide the sections based on the selected status
                 if (selectedStatus === '1' || selectedStatus === '4') {
                     companyAccessSection.style.display = 'none';
+                    priceAccessSection.style.display = 'none';
                 } else {
                     companyAccessSection.style.display = 'block';
+                    priceAccessSection.style.display = 'block';
                 }
             });
-
-
         });
     </script>
 
@@ -278,19 +318,41 @@
                 confirmButtonText: 'Close'
             });
         @elseif(session('danger_message'))
-            Swal.fire({
-                title: 'Invalid Input',
-                text: '{{session('danger_message') }}',
-                icon: 'error',
-                timer: 3000,
-                showCancelButton: false,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-            });
+            const dangerMessage = '{{ session('danger_message') }}';
+            const validationErrors = {!! json_encode(session('validation_errors')) !!};
+
+            if (validationErrors.length > 0) {
+                let errorMessage = ' \n<ul>';
+
+                validationErrors.forEach(error => {
+                    errorMessage += `<li>${error}</li>`;
+                });
+
+                errorMessage += '</ul>';
+
+                Swal.fire({
+                    title: 'Validation Error',
+                    html: errorMessage,
+                    icon: 'error',
+                    // timer: 5000,
+                    showCancelButton: false,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                });
+            } else {
+                Swal.fire({
+                    title: 'Invalid Input',
+                    text: dangerMessage,
+                    icon: 'error',
+                    timer: 3000,
+                    showCancelButton: false,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                });
+            }
         @endif
-    </script>
-    {{-- Sweeet Alert for delete/restore --}}
-    <script>
+
+    // Sweeet Alert for delete/deactivate/restore popup
         document.addEventListener('DOMContentLoaded', () => {
             const deleteButtons = document.querySelectorAll('.btn-delete');
             const activeButtons = document.querySelectorAll('.btn-active');
