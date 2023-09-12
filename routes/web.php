@@ -7,6 +7,7 @@ use App\Http\Controllers\CollectionController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\UsersController;
 use App\Http\Controllers\AuditTrailController;
+use App\Http\Controllers\DropboxController;
 
 
 use App\Http\Livewire\TableFilter;
@@ -43,6 +44,8 @@ Route::middleware(['auth', 'admin-access'])->group(function () {
     Route::post('/users-trash/{id}', [UsersController::class, 'trash'])->name('users.trash');
     Route::post('/users-restore/{id}', [UsersController::class, 'restore'])->name('users.restore');
     Route::get('/users-edit/{encryptedId}', [UsersController::class, 'edit'])->name('users.edit');
+    Route::post('/users-update/{id}', [UsersController::class, 'update'])->name('users.update');
+
     // Company
     Route::get('/company', [CompanyController::class, 'index'])->name('company');
     //Audit trail
@@ -58,6 +61,7 @@ Route::middleware(['auth', 'can:viewer-access'])->group(function () {
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
+
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

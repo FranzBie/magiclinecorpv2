@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Company;
+use App\Models\AuditTrail;
 
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
@@ -77,6 +78,11 @@ class UsersController extends Controller
             throw new \Exception('Failed to create user');
         }
 
+
+        // Add audit trail for the "Added" action with the item reference
+        $activity = "Added User " . $request->name;
+        $this->logAuditTrail(auth()->user(), $activity);
+
         // Handle different user statuses
         if ($request->status == 1 || $request->status == 4)
         {
@@ -126,6 +132,12 @@ class UsersController extends Controller
             $user->activeStatus = 0;
             $user->addedBy = $addedByInfo;
             $user->save();
+
+            // Log the audit trail entry for user deactivation
+            $activity = "Deactivated User {$user->name}";
+            $user = Auth::user();
+            $this->logAuditTrail($user, $activity);
+
             return response()->json(['success' => true, 'message' => 'User is Inactive']);
         }
     }
@@ -141,6 +153,12 @@ class UsersController extends Controller
         if ($user->activeStatus == 0) {
             //activeStatus -> 1 and addedBy to Retored by user
             $user->update(['activeStatus' => 1, 'addedBy' => $addedByInfo]);
+
+            // Log the audit trail entry for user restoration
+            $activity = "Restored User {$user->name}";
+            $user = Auth::user();
+            $this->logAuditTrail($user, $activity);
+
             return response()->json(['success' => true]);
         } else {
             return response()->json(['success' => true]);
@@ -148,6 +166,7 @@ class UsersController extends Controller
         return redirect()->back()->with('danger_message', 'An error occurred while restoring the item.');
     }
 
+    // View User being edited
     public function edit($encryptedId)
     {
         try {
@@ -155,7 +174,7 @@ class UsersController extends Controller
             $id = Crypt::decrypt($encryptedId);
         } catch (DecryptException $e) {
             // Redirect with an error message if decryption fails
-            return redirect()->route('users')->with('danger_message', 'Invalid URL.');
+            return redirect()->back()->with('danger_message', 'Invalid URL.');
         }
 
         // Get the authenticated user
@@ -163,7 +182,6 @@ class UsersController extends Controller
 
         // Fetch the selected mannequin
         $user = User::find($id);
-        $users = User::with('companies')->get();
         $companies = Company::all();
 
         // Return the view with the required data
@@ -171,6 +189,88 @@ class UsersController extends Controller
             'user' => $user,
             'companies' => $companies,
         ]);
+    }
+
+    //EDIT User
+    public function update(Request $request, $id)
+    {
+        $user = Auth::user();
+        $addedByInfo = $this->getAddedByInfo('Updated', $user);
+
+        // Keep the original itemref for audit trail
+        $originalName = $user->name;
+
+        // Create an array to store updates
+        $updates = [];
+
+        // Validate the request data
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'username' => 'required|string|max:255|unique:users,username,' . $id,
+            'email' => 'required|email|max:255|unique:users,email,' . $id,
+            'status' => 'required|in:1,2,3,4',
+            'company_ids' => $request->status == 1 || $request->status == 4 ? 'nullable|array' : 'required|array',
+        ]);
+
+        if ($validator->fails()) {
+            $errors = $validator->errors()->all();
+
+            return redirect('/users')
+                ->with('validation_errors', $errors)
+                ->withInput()
+                ->with('danger_message', 'Input Incorrect: Please check the form fields and try again.');
+        }
+
+        // Find the user by ID
+        $user = User::findOrFail($id);
+
+        // Update user information
+        $user->update([
+            'name' => $request->input('name'),
+            'username' => $request->input('username'),
+            'email' => $request->input('email'),
+            'status' => $request->input('status'),
+            'addedBy' => $addedByInfo,
+        ]);
+
+        if ($request->status == 1 || $request->status == 4)
+        {
+            // User status is admin or owner, so remove all company relationships
+            $user->companies()->detach();
+
+            // User status is admin or owner, so redirect with success message
+            return redirect()->route('users')->with('success_message', 'User Updated successfully.');
+        }
+        else
+        {
+            // Attach selected companies to the user
+            $user->companies()->sync($request['company_ids']);
+
+            // Handle price access (checkPrice) for selected companies
+            if (isset($request['company_ids'])) {
+                foreach ($request['company_ids'] as $companyId) {
+                    // Check if the company_id should have checkPrice
+                    $checkPrice = in_array($companyId, $request->input('selected_company_ids', [])) ? 1 : NULL;
+
+                    $user->companies()->updateExistingPivot($companyId, [
+                        'checkPrice' => $checkPrice,
+                    ]);
+                }
+            }
+
+            // Redirect to a success page or return a response as needed
+            return redirect()->route('users')->with('success_message', 'User updated successfully');
+        }
+    }
+
+    //Audit Trail
+    public function logAuditTrail($user, $activity)
+    {
+        $log = new AuditTrail;
+        $log->name = $user->name;
+        $log->user_id = $user->id;
+        $log->activity = $activity;
+        $log->save();
     }
 
 }

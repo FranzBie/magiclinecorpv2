@@ -28,7 +28,7 @@
     <div class="py-2">
         <div class="max-w-7xl mx-auto sm:px-3 lg:px-8">
             <div class="bg-white shadow-md rounded-lg auto px-4 py-6">
-                <form method="POST" action="" enctype="multipart/form-data">
+                <form method="POST" action="{{ route('users.update', ['id' => $user->id]) }}" enctype="multipart/form-data">
                     @csrf
                     {{-- Name --}}
                     <div class="mb-4">
@@ -45,22 +45,6 @@
                         <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
                         <input type="email" name="email" id="email" value="{{ $user->email }}" class="mt-1 p-2 border rounded-md w-full" required>
                     </div>
-
-                    <!--{{-- Password --}}
-                    <div class="mb-4">
-                        <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-                        <div class="relative">
-                            <input type="password" name="password" id="password" class="mt-1 p-2 border rounded-md w-full" required>
-                            <button type="button" id="togglePassword" class="absolute top-1/2 transform -translate-y-1/2 right-2">
-                                <i id="passwordIcon" class="fas fa-eye-slash text-gray-400 cursor-pointer"></i>
-                            </button>
-                        </div>
-                    </div>
-                    {{-- Confirm Pass --}}
-                    <div class="mb-4">
-                        <label for="password_confirmation" class="block text-sm font-medium text-gray-700">Confirm Password</label>
-                        <input type="password" name="password_confirmation" id="password_confirmation" class="mt-1 p-2 border rounded-md w-full" required>
-                    </div>-->
 
                     <div class="mb-4">
                         <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
@@ -96,18 +80,24 @@
                                 @endforeach
                             </div>
                         </div>
-
                         {{-- Price Access --}}
                         <div id="priceAccessSection" class="flex-1">
                             <div class="mt-1">
                                 <label class="block text-sm font-medium text-gray-700">Price Access</label>
                                 <div id="selected-companies">
-                                    <!-- Selected companies will be listed here dynamically -->
+                                    @foreach ($user->companies as $company)
+                                        <div class="w-auto">
+                                            <label class="inline-flex">
+                                                <input type="checkbox" name="selected_company_ids[]" value="{{ $company->id }}" class="selected-company-checkbox rounded border-gray-300 font-medium text-indigo-600 shadow-sm focus:ring-indigo-500 mx-1"
+                                                    {{ $company->pivot->checkPrice ? 'checked' : '' }}>
+                                                <span class="block text-sm font-medium text-gray-700 mx-2">{{ $company->name }}</span>
+                                            </label>
+                                        </div>
+                                    @endforeach
                                 </div>
                             </div>
                         </div>
                     </div>
-
                     <div class="mb-4">
                         <button type="submit" class="mt-4 mb-4 inline-flex items-center px-5 py-3 bg-gray-800 border border-transparent rounded-md font-semibold text-sm text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
                             Update
@@ -118,19 +108,86 @@
             </div>
         </div>
     </div>
+
+    {{-- SCRIPTS --}}
     <script>
+        // COMPANY/PRICE ACCESS CHECKBOX SCRIPT
+        document.addEventListener("DOMContentLoaded", function() {
+            // Get references to the relevant elements
+            const companyCheckboxes = document.querySelectorAll(".company-checkbox");
+            const selectedCompaniesContainer = document.getElementById("selected-companies");
+            const selectAllCompaniesCheckbox = document.getElementById("select-all-companies");
+
+            // Helper function to add or remove a selected company in Price Access
+            function toggleSelectedCompany(companyId, isChecked) {
+                const selectedCompanyCheckbox = document.querySelector(
+                    `.selected-company-checkbox[value="${companyId}"]`
+                );
+
+                if (selectedCompanyCheckbox) {
+                    if (!isChecked) {
+                        // If unchecked in Company Access, remove it from Price Access
+                        selectedCompanyCheckbox.parentElement.parentElement.remove();
+                    } else {
+                        selectedCompanyCheckbox.checked = isChecked;
+                    }
+                } else if (isChecked) {
+                    // Create a new selected company element if it doesn't exist
+                    const company = document.querySelector(
+                        `.company-checkbox[value="${companyId}"]`
+                    );
+
+                    if (company) {
+                        const companyName = company.nextElementSibling.textContent.trim();
+
+                        const newSelectedCompany = document.createElement('div');
+                        newSelectedCompany.classList.add('w-auto');
+                        newSelectedCompany.innerHTML = `
+                            <label class="inline-flex">
+                                <input type="checkbox" name="company_ids[]" value="${companyId}" class="selected-company-checkbox rounded border-gray-300 font-medium text-indigo-600 shadow-sm focus:ring-indigo-500 mx-1" checked>
+                                <span class="block text-sm font-medium text-gray-700 mx-2">${companyName}</span>
+                            </label>
+                        `;
+
+                        selectedCompaniesContainer.appendChild(newSelectedCompany);
+                    }
+                }
+            }
+
+            // Add event listeners to company checkboxes in Company Access
+            companyCheckboxes.forEach(function(checkbox) {
+                checkbox.addEventListener("change", function() {
+                    const companyId = checkbox.value;
+                    const isChecked = checkbox.checked;
+                    toggleSelectedCompany(companyId, isChecked);
+                });
+            });
+
+            // Add an event listener to the "Select All" checkbox in Company Access
+            selectAllCompaniesCheckbox.addEventListener("change", function() {
+                const isChecked = this.checked;
+
+                // Update the state of all individual company checkboxes in Company Access
+                companyCheckboxes.forEach(checkbox => {
+                    checkbox.checked = isChecked;
+                    const companyId = checkbox.value;
+                    toggleSelectedCompany(companyId, isChecked);
+                });
+            });
+        });
         // DROPDOWN
         // Get references to the select element and both sections
         const statusDropdown = document.getElementById('status');
         const companyAccessSection = document.getElementById('companyAccessSection');
         const priceAccessSection = document.getElementById('priceAccessSection');
+        const selectedCompaniesDiv = document.getElementById('selected-companies');
 
         // Function to toggle the visibility of sections based on the selected status
         function toggleSections() {
             const selectedStatus = statusDropdown.value;
 
             // Check the selected status and hide/show the sections accordingly
-            if (selectedStatus === '1' || selectedStatus === '4') {
+            if (selectedStatus == '1' || selectedStatus == '4') {
                 companyAccessSection.style.display = 'none';
                 priceAccessSection.style.display = 'none';
             } else {
@@ -143,23 +200,6 @@
 
         // Trigger the change event initially to set the initial visibility
         statusDropdown.dispatchEvent(new Event('change'));
-
-
-        // CHECKBOX SELCT ALL
-        // Get references to the "Select All" checkbox and individual company checkboxes
-        const selectAllCheckbox = document.getElementById('select-all-companies');
-        const companyCheckboxes = document.querySelectorAll('.company-checkbox');
-
-        // Add an event listener to the "Select All" checkbox
-        selectAllCheckbox.addEventListener('change', function() {
-            // Get the checked state of the "Select All" checkbox
-            const isChecked = this.checked;
-
-            // Update the state of all individual company checkboxes
-            companyCheckboxes.forEach(checkbox => {
-                checkbox.checked = isChecked;
-            });
-        });
     </script>
 
 </x-app-layout>

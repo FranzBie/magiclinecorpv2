@@ -78,21 +78,19 @@
                         </div>
                     </div>
                     {{-- BUTTON FOR DELETING SELECTED CHECKBOXES --}}
-                    @can('super_admin', Auth::user())
-                    <div class="filter-dropdown">
+                    {{-- <div class="filter-dropdown">
                         <select id="bulkAction" class="hidden block w-52 mb-2 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Filter by Company">
                             <option value="">Bulk Action</option>
-                                <option value="deleteSelectedButton">Delete Selected Item/s</option>
+                                <option>Delete Selected Item/s</option>
                         </select>
-                    </div>
-                    {{-- <button id="bulkAction" class="hidden bg-red-500 block w-52 py-2 px-3 border border-gray-300 text-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div> --}}
+                    <button id="bulkAction" class="hidden bg-red-500 block w-52 py-2 px-3 mb-2 border border-gray-300 text-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                         Delete All
-                    </button> --}}
-                    @endcan
+                    </button>
 
                     {{-- TABLE --}}
                     <table id="mannequinsTable" class="w-full table-auto border-collapse border">
-                        <thead class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap bg-gray-50 dark:text-white dark:bg-gray-800">
+                        <thead class="px-6 py-4 font-medium whitespace-nowrap text-white bg-gray-800 rounded-md">
                             <tr>
                                 @can('super_admin', Auth::user())
                                 <th class="px-4 py-2 border">
@@ -119,19 +117,32 @@
                                         </td>
                                         @endcan
                                         {{-- Images --}}
-                                        <td class="px-7 py-2 border">
-                                            @php
+                                        @php
+                                            // Cache the image URL for a limited time (e.g., 1 hour)
+                                            $imageCacheKey = 'image_' . $mannequin->id;
+                                            $imageUrl = Cache::remember($imageCacheKey, now()->addHours(1), function () use ($mannequin) {
                                                 // Split the image paths string into an array
                                                 $imagePaths = explode(',', $mannequin->images);
                                                 // Get the first image path from the array
                                                 $firstImagePath = $imagePaths[0] ?? null;
-                                            @endphp
-                                            @if ($firstImagePath)
-                                                <img src="{{ asset('storage/' . $firstImagePath) }}" alt="Mannequin Photo" width="100">
+
+                                                if (Storage::disk('dropbox')->exists($firstImagePath)) {
+                                                    return Storage::disk('dropbox')->url($firstImagePath);
+                                                } else {
+                                                    return null;
+                                                }
+                                            });
+                                        @endphp
+
+                                        <td class="px-7 py-2 border">
+                                            @if ($imageUrl)
+                                            <img src="{{ $imageUrl }}" alt="Mannequin Image" class="w-16 h-16 object-contain" loading="lazy">
+
                                             @else
-                                                No Image
+                                                <p>Image not found</p>
                                             @endif
                                         </td>
+
                                         <td class="px-7 py-2 border itemref-cell">
                                             {{-- ITEM REF --}}
                                             <span class="itemref-text">{{ $mannequin->itemref }}</span>
@@ -205,31 +216,36 @@
             });
 
             // Handle "Delete All" button click
-            $('#deleteSelectedButton').on('click', function() {
+            $('#bulkAction').on('click', function() {
                 console.log('Button clicked');
 
                 var selectedIds = [];
                 $('td input.row-checkbox:checked').each(function() {
                     selectedIds.push($(this).data('item-id'));
                 });
-                console.log(selectedIds);
+                console.log('Selected IDs:', selectedIds);
+
                 if (selectedIds.length > 0) {
                     $.ajax({
-                        url: '{{ route('collection.trashMultiple') }}', // Correct route generation
+                        url: '{{ route('collection.trashMultiple') }}',
                         method: 'POST',
                         data: { ids: selectedIds },
                         headers: {
                             'X-Requested-With': 'XMLHttpRequest',
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}' // Include the CSRF token
-
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
                         },
-                        success: function(response)
-                        {
-                            console.log('url:', response.url);
-                            console.log('method:', response.method);
-                            console.log('Response:', response.data);
-                            if (response.success) {
-                                console.log('Response:', response.data);
+                        success: function(data, textStatus, jqXHR) {
+                            console.log('AJAX Request URL:', this.url);
+                            console.log('AJAX Request Method:', this.type);
+                            console.log('AJAX Request Headers:', this.headers);
+                            console.log('AJAX Request Data:', this.data);
+
+                            console.log('Response URL:', jqXHR.responseURL); // Log the response URL
+                            console.log('Response Status:', textStatus); // Log the response status
+                            console.log('Response Data:', data); // Log the response data
+
+                            if (data.success) {
+                                console.log('Response:', data.data);
                                 // Refresh the page or update the table as needed
                                 location.reload();
                             }
@@ -238,7 +254,7 @@
                 }
             });
 
-            //Category FIlter
+            //Category Filter
             $('#categoryFilter').on('change', function() {
                 var category = $(this).val();
 

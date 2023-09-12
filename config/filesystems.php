@@ -29,12 +29,20 @@ return [
     */
 
     'disks' => [
-
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app'),
             'throw' => false,
         ],
+        'dropbox' => [
+            'driver' => 'dropbox',
+            'key' => env('DROPBOX_APP_KEY'),
+            'secret' => env('DROPBOX_APP_SECRET'),
+            'authorization_token' => env('DROPBOX_AUTH_TOKEN'),
+            'refresh_token' => env('DROPBOX_REFRESH_TOKEN'), // Include the refresh token
+            'redirect' => env('DROPBOX_REDIRECT_URI'),
+        ],
+
 
         'public' => [
             'driver' => 'local',

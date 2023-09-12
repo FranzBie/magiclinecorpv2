@@ -19,6 +19,10 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Cache;
+
+use Spatie\Dropbox\Client as DropboxClient;
+use Spatie\FlysystemDropbox\DropboxAdapter;
 
 use DataTables;
 
@@ -71,6 +75,8 @@ class CollectionController extends Controller
             'mannequins' => $mannequins,
             'companies' => $companies,
             'companyName' => $selectedCompany,
+            'user' => $user,
+            // 'dropboxFiles' => $files,
         ]);
     }
 
@@ -86,19 +92,6 @@ class CollectionController extends Controller
             $model->addedBy = $newHistory;
         }
     }
-
-        // public function sanitizeAndValidateDescription($description)
-        // {
-        //     // Remove any potentially dangerous HTML/JS tags
-        //     $sanitizedDescription = strip_tags($description);
-
-        //     // Trim any extra spaces
-        //     $sanitizedDescription = trim($sanitizedDescription);
-
-        //     // Ensure the description length is within a reasonable limit
-        //     $sanitizedDescription = Str::limit($sanitizedDescription, 1000); // Adjust the limit as needed
-
-        // }
 
     // VIEW PRODUCT
     public function view($encryptedId)
@@ -163,24 +156,36 @@ class CollectionController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'po' => 'nullable|string|max:255',
-            'itemRef' => 'required|string|max:255',
-            'company' => 'nullable|string|max:255',
-            'category' => 'nullable|string|max:255',
-            'type' => 'nullable|string|max:255',
+            // 'po' => 'nullable|string|max:255|unique:mannequins,po',
+            'itemRef' => 'required|string|max:255|unique:mannequins,itemref',
+            'company' => 'required|nullable|string|max:255',
+            'category' => 'required|nullable|string|max:255',
+            'type' => 'required|nullable|string|max:255',
             'price' => 'nullable|numeric',
             'description' => 'nullable',
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
-            'file' => 'nullable|mimes:xlsx,xls|max:2048',
+            'images' => 'required|array|min:1|max:8', // Ensure at least one image is present
+            'images.*' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'file' => 'nullable|mimes:xlsx,xls|max:2048',//COSTING
             'pdf' => 'nullable|mimes:pdf|max:2048',
+        ], [
+            // 'po.unique' => 'The Purchase Order is already being used.',
+            'itemRef.required' => 'The Item Reference is required.',
+            'itemRef.unique' => 'The Item Reference is already taken.',
+            'images.required' => 'At least one image is required.',
+            'images.min' => 'At least one image is required.',
+            'images.*.max' => 'The :attribute must be less than or equal to 2 MB.',
+            'images.*.max' => 'The :attribute must be less than or equal to 2 MB.',
+            'file.max' => 'The :attribute must be less than or equal to 2 MB.',
+            'pdf.max' => 'The :attribute must be less than or equal to 2 MB.',
         ]);
 
         if ($validator->fails()) {
-            return redirect('/collection-add')->with('danger_message', 'Input Incorrect or Files Too Large(Max 2MB): Please check the form fields and try again.')
+            return redirect('/collection-add')->with('danger_message', ' ')
                 ->withErrors($validator)
                 ->withInput();
         }
 
+        //uploaded files
         $photoPaths = [];
         $excelFileName = null;
         $pdfFileName = null;
@@ -189,8 +194,13 @@ class CollectionController extends Controller
         if ($request->hasFile('images')) {
             foreach ($request->file('images') as $photo) {
                 $photoName = time() . '_' . $photo->getClientOriginalName();
-                $photoPaths[] = 'images/product/' . $photoName;
-                $photo->storeAs('public/images/product/', $photoName);
+                $path = 'Magicline Database/images/product/' . $photoName; // Relative path within Dropbox
+
+                // Upload the image to Dropbox
+                Storage::disk('dropbox')->put($path, file_get_contents($photo));
+
+                // Store the Dropbox path in your database
+                $photoPaths[] = $path;
             }
         }
 
@@ -219,12 +229,12 @@ class CollectionController extends Controller
             'description' => $request->description,
         ]);
 
-        $this->setActionBy($mannequin, 'Added');
-        $mannequin->activeStatus = "1";
-
         if (!empty($photoPaths)) {
             $mannequin->images = implode(',', $photoPaths);
         }
+
+        $this->setActionBy($mannequin, 'Added');
+        $mannequin->activeStatus = "1";
 
         if ($excelFileName !== null) {
             $mannequin->file = $excelFileName;
@@ -235,8 +245,13 @@ class CollectionController extends Controller
         }
 
         if ($mannequin->save()) {
+            // Add audit trail for the "Added" action with the item reference
+            $activity = "Added " . $request->itemRef;
+            $this->logAuditTrail(auth()->user(), $activity);
+
             return redirect('/collection')->with('success_message', 'Collection has been successfully added!');
-        } else {
+        }
+        else {
             return redirect('/collection')->with('danger_message', 'DATABASE ERROR!');
         }
     }
@@ -294,99 +309,132 @@ class CollectionController extends Controller
         ]);
     }
 
-    //EDIT Product
     public function update(Request $request, $id)
     {
-        $user = Auth::user();
-        // Find the Mannequin by ID or throw a 404 error if not found
-        $mannequin = Mannequin::findOrFail($id);
-
-        // Keep the original itemref for audit trail
-        // $originalItemref = $mannequin->itemref;
-
-        // Update the fields using the request input directly
-        $mannequin->fill([
-            'po' => $request->input('po'),
-            'itemref' => $request->input('itemref'),
-            'company' => $request->input('company'),
-            'category' => $request->input('category'),
-            'type' => $request->input('type'),
-            'price' => $request->input('price'),
-            'description' => $request->input('description'),
-            $file = $request->file('file'),
+        $validator = Validator::make($request->all(), [
+            // 'po' => 'nullable|string|max:255|unique:mannequins,po,' . $id,
+            'itemref' => 'required|string|max:255|unique:mannequins,itemref,' . $id,
+            'company' => 'required|nullable|string|max:255',
+            'category' => 'required|nullable|string|max:255',
+            'type' => 'required|nullable|string|max:255',
+            'price' => 'nullable|numeric',
+            'description' => 'nullable',
+            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'file' => 'nullable|mimes:xlsx,xls|max:2048',
+            'pdf' => 'nullable|mimes:pdf|max:2048',
+        ], [
+            // 'po.unique' => 'The Purchase Order is already being used.',
+            'itemref.required' => 'The Item Reference is required.',
+            'itemref.unique' => 'The Item Reference has already been taken.',
+            'images.*.max' => 'The :attribute must be less than or equal to 2 MB.',
+            'file.max' => 'The :attribute must be less than or equal to 2 MB.',
+            'pdf.max' => 'The :attribute must be less than or equal to 2 MB.',
         ]);
 
-        // Update images
-        if ($request->hasFile('images')) {
-            // Remove the old images if they exist
-            foreach (explode(',', $mannequin->images) as $oldImagePath) {
-                // Delete the old image from storage
-                Storage::delete('public/product/' . trim($oldImagePath));
-            }
+        // If validation fails, redirect back with errors
+        if ($validator->fails()) {
+            return redirect()->back()->with('danger_message', ' ')
+                ->withErrors($validator)
+                ->withInput();
+        }
 
+        $user = Auth::user();
+        $mannequin = Mannequin::findOrFail($id);
+
+        // Store the original itemref for the audit trail
+        $originalItemref = $mannequin->itemref;
+
+        // Define the fields that can be updated
+        $fillableFields = ['po', 'company', 'category', 'type', 'price', 'description'];
+
+        $updates = [];
+
+        foreach ($fillableFields as $field) {
+            if ($request->has($field) && $request->input($field) !== $mannequin->{$field}) {
+                $mannequin->{$field} = $request->input($field);
+                $updates[] = strtoupper($field);
+            }
+        }
+
+        // Handle the "itemref" field separately for old and new values
+        if ($request->has('itemref') && $request->input('itemref') !== $mannequin->itemref) {
+            $oldItemref = $mannequin->itemref; // Store the old itemref
+            $newItemref = $request->input('itemref'); // Store the new itemref
+            $mannequin->itemref = $newItemref;
+            $updates[] = "Itemref (new: $newItemref, old: $oldItemref)";
+        }
+
+        // Handle image uploads
+        // Optimize image upload using Dropbox
+        if ($request->hasFile('images')) {
             $imagePaths = [];
 
-            foreach ($request->file('images') as $image) {
-                $imageName = time() . '_' . $image->getClientOriginalName();
-                $image->storeAs('public/images/product', $imageName);
-                $imagePaths[] = 'images/product/' . $imageName;
+            // Clear the cache associated with the first cache key
+            Cache::forget('image_' . $mannequin->id);
+
+            // Clear the cache associated with the second cache key
+            Cache::forget('images_' . $mannequin->id);
+
+            foreach ($request->file('images') as $photo) {
+                $photoName = time() . '_' . $photo->getClientOriginalName();
+                $path = '/Magicline Database/images/product/' . $photoName; // Dropbox path
+
+                // Upload the image to Dropbox
+                Storage::disk('dropbox')->put($path, file_get_contents($photo->path()));
+
+                // Store the Dropbox path in your database
+                $photoPaths[] = $path;
+            }
+
+            // Remove old images from Dropbox
+            $oldImagePaths = explode(',', $mannequin->images);
+            foreach ($oldImagePaths as $oldImagePath) {
+                // Delete the old image from Dropbox
+                Storage::disk('dropbox')->delete($oldImagePath);
             }
 
             // Update the images field in the database
-            $mannequin->images = implode(',', $imagePaths);
+            $mannequin->images = implode(',', $photoPaths);
+            $updates[] = 'Images';
         }
 
-        //FOR COSTING
-        if ($request->hasFile('file')) {
-            // Remove the old file if it exists
-            if ($mannequin->file) {
-                // Delete the old file from storage
-                Storage::delete('public/files/' . $mannequin->file);
+        // Handle file uploads
+        $fileFields = ['file', 'pdf'];
+
+        foreach ($fileFields as $field) {
+            if ($request->hasFile($field)) {
+                // Remove the old file if it exists
+                if ($mannequin->{$field}) {
+                    Storage::delete('public/files/' . $mannequin->{$field});
+                }
+
+                $file = $request->file($field);
+                $filename = $file->getClientOriginalName();
+
+                // Store the file in the desired storage location (public disk in this case)
+                $file->storeAs('public/files', $filename);
+
+                // Update the file field in the database
+                $mannequin->{$field} = $filename;
+                $updates[] = ucfirst($field);
             }
-
-            $file = $request->file('file');
-            $filename = $file->getClientOriginalName();
-
-            // Store the file in the desired storage location (public disk in this case)
-            $file->storeAs('public/files', $filename);
-
-            // Update the file field in the database
-            $mannequin->file = $filename;
-        }
-        //FOR PDF
-        if ($request->hasFile('pdf')) {
-            // Remove the old PDF if it exists
-            if ($mannequin->pdf) {
-                // Delete the old PDF from storage
-                Storage::delete('public/files/' . $mannequin->pdf);
-            }
-
-            $pdfFile = $request->file('pdf');
-            $pdfFilename = $pdfFile->getClientOriginalName();
-
-            // Store the PDF file in the desired storage location (public disk in this case)
-            $pdfFile->storeAs('public/files', $pdfFilename);
-
-            // Update the pdf field in the database
-            $mannequin->pdf = $pdfFilename;
         }
 
         $this->setActionBy($mannequin, 'Modified');
 
         $mannequin->save();
 
-        // Log the audit trail entry for the 'update' activity
-        // $activity = "Updated $originalItemref"; // Concatenate the activity
-        // $this->logAuditTrail(auth()->user(), $activity, $originalItemref);
-
-        if($user->status == 4){
-            return redirect()->route('dashboard', $mannequin->id)->with('success_message', 'Product details updated successfully.');
-        }
-        else{
-            return redirect()->route('collection', $mannequin->id)->with('success_message', 'Product details updated successfully.');
+        // Generate the "Updated" message based on the fields that were updated
+        if (!empty($updates)) {
+            $activity = "Updated " . implode(', ', $updates) . " of $originalItemref";
+            $this->logAuditTrail(auth()->user(), $activity);
         }
 
+        $routeName = $user->status == 4 ? 'dashboard' : 'collection';
+
+        return redirect()->route($routeName, $mannequin->id)->with('success_message', 'Product details updated successfully.');
     }
+
 
     //SHOW TRASHCAN
     public function trashcan()
@@ -400,18 +448,29 @@ class CollectionController extends Controller
     {
         $mannequin = Mannequin::find($id);
         if ($mannequin) {
+            // Store the original item reference for the audit trail
+            $originalItemref = $mannequin->itemref;
+
             $mannequin->activeStatus = 0;
             $this->setActionBy($mannequin, 'Deleted');
             $mannequin->save();
+
+            // Add audit trail for the "Deleted" action with the original item reference
+            $activity = "Trashed $originalItemref";
+            $this->logAuditTrail(auth()->user(), $activity);
 
             return response()->json(['success' => true]);
         }
         return response()->json(['success' => false]);
     }
 
-    // DELETE to trashcan multiple collections
+    // Trash Multiple Products
     public function trashMultiple(Request $request)
     {
+        $request->validate([
+            'ids' => 'required|array', // Add any other validation rules as needed
+        ]);
+
         $ids = $request->input('ids');
 
         if (!empty($ids)) {
@@ -424,10 +483,11 @@ class CollectionController extends Controller
                     $mannequin->save();
                 }
             }
-            return redirect()->back()->with('success_message', 'Item deleted permanently.');
+
+            return response()->json(['message' => 'Product details updated successfully.']);
         }
 
-        return response()->json(['success' => false]);
+        return response()->json(['message' => 'No products selected.'], 400);
     }
 
     //Delete (PERMANENTLY from database to storage)
@@ -435,13 +495,20 @@ class CollectionController extends Controller
     {
         $mannequin = Mannequin::findOrFail($id);
 
+        // Store the original item reference for the audit trail
+        $originalItemref = $mannequin->itemref;
+
         // Delete associated images
         foreach (explode(',', $mannequin->images) as $imagePath) {
-            Storage::delete('public/' . trim($imagePath));
+            Storage::disk('dropbox')->delete($imagePath);
         }
 
         // Delete the Mannequin record from the database
         $mannequin->delete();
+
+        // Add audit trail for the "Deleted Permanently" action with the original item reference
+        $activity = "Deleted Permanently $originalItemref";
+        $this->logAuditTrail(auth()->user(), $activity);
 
         // Retrieve the updated $mannequins collection after deletion
         $mannequins = Mannequin::where('activeStatus', '<', 1)->get();
@@ -455,8 +522,16 @@ class CollectionController extends Controller
         $mannequin = Mannequin::findOrFail($id);
         // Check if the item is actually deleted (activeStatus = 0)
         if ($mannequin->activeStatus == 0) {
+            // Store the original item reference for the audit trail
+            $originalItemref = $mannequin->itemref;
+
             $this->setActionBy($mannequin, 'Restored');
             $mannequin->update(['activeStatus' => 1]);
+
+            // Add audit trail for the "Restored" action with the original item reference
+            $activity = "Restored $originalItemref";
+            $this->logAuditTrail(auth()->user(), $activity);
+
             return redirect()->route('collection')->with('success_message', 'Item restored successfully.');
         } else {
             return redirect()->route('collection')->with('danger_message', 'Item is not restored.');
@@ -555,12 +630,13 @@ class CollectionController extends Controller
     }
 
     //Audit Trail
-    // public function logAuditTrail($user, $activity)
-    // {
-    //     $log = new AuditTrail;
-    //     $log->user_id = $user->id;
-    //     $log->activity = $activity;
-    //     $log->save();
-    // }
+    public function logAuditTrail($user, $activity)
+    {
+        $log = new AuditTrail;
+        $log->name = $user->name;
+        $log->user_id = $user->id;
+        $log->activity = $activity;
+        $log->save();
+    }
 }
 

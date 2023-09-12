@@ -25,6 +25,29 @@ Collection
     @php
         // Split the image paths string into an array
         $imagePaths = explode(',', $mannequin->images);
+        $imageCacheKey = 'image_' . $mannequin->id;
+        $imageUrl = Cache::remember($imageCacheKey, now()->addHours(1), function () use ($imagePaths) {
+            if (Storage::disk('dropbox')->exists($imagePaths)) {
+                return Storage::disk('dropbox')->url($imagePaths);
+            } else {
+                return null;
+            }
+        });
+
+        // Split the image paths string into an array
+        $imagePaths = explode(',', $mannequin->images);
+        $imageCacheKey = 'images_' . $mannequin->id;
+        $imageUrls = Cache::remember($imageCacheKey, now()->addHours(1), function () use ($imagePaths) {
+            $imageUrls = [];
+
+            foreach ($imagePaths as $imagePath) {
+                if (Storage::disk('dropbox')->exists($imagePath)) {
+                    $imageUrls[] = Storage::disk('dropbox')->url($imagePath);
+                }
+            }
+
+            return $imageUrls;
+        });
     @endphp
 
     <x-slot name="header">
@@ -61,17 +84,25 @@ Collection
             {{-- Display Images --}}
             <div class="w-full md:w-1/2 mb-4 md:mb-0 flex flex-col justify-center items-center">
                 {{-- MAIN Image --}}
-                <div class="w-10/12 md:w-8/12 img-magnifier-container relative">
-                    <img id="mainImage" src="{{ asset('storage/' . $imagePaths[0]) }}" alt="Product Image" class="main-image w-full h-auto object-cover">
-                </div>
+                @if ($imageUrl)
+                    <div class="w-10/12 md:w-8/12 img-magnifier-container relative">
+                        <img id="mainImage" src="{{ $imageUrl }}" alt="Product Image" class="main-image w-full h-auto object-cover" loading="lazy">
+                    </div>
+                @else
+                    <p>Image not found</p>
+                @endif
                 {{-- SELECT IMAGE --}}
+                @if ($imageUrls)
                 <div class="flex mt-1 space-x-1 overflow-hidden">
-                    @foreach ($imagePaths as $index => $imagePath)
+                    @foreach ($imageUrls as $index => $imagePath)
                         <div class="w-1/5 zoomable-image" data-image-index="{{ $index }}">
-                            <img src="{{ asset('storage/' . $imagePath) }}" alt="Product Image" class="w-full h-full object-cover">
+                            <img src="{{ $imagePath }}" alt="Product Image" class="w-full h-full object-cover">
                         </div>
                     @endforeach
                 </div>
+                @else
+                    <p>Image not found</p>
+                @endif
             </div>
             {{-- DETAILS --}}
             <div class="md:w-1/2">
